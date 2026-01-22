@@ -668,8 +668,3 @@ python -m pytest tests/test_question_response.py
 **IMPORTANT:** This tool augments  observation and does not replace professional  judgment. Always involve qualified clinicians in result interpretation and  decision-making processes.
 
 ---
-
-**Version:** 2.0 (Phase 2 Production Release)  
-**Last Updated:** January 22, 2026  
-**Status:** PRODUCTION READY (All  Features Validated)
-
