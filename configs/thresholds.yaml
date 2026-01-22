@@ -1,0 +1,248 @@
+# Rule-based thresholds for behavioral dysregulation detection
+# All values are empirically tunable based on validation data
+
+# ===== AUDIO PIPELINE =====
+audio:
+  # Voice Activity Detection
+  vad:
+    frame_duration_ms: 30  # Silero VAD frame size
+    min_speech_duration_ms: 250  # Minimum speech segment length
+    min_silence_duration_ms: 100  # Minimum silence gap
+    
+  # Speaker Diarization
+  diarization:
+    min_speakers: 2  # Expected: patient + clinician
+    max_speakers: 2
+    
+  # Prosodic Features
+  prosody:
+    # Speech rate (syllables/second)
+    normal_speech_rate_min: 3.0
+    normal_speech_rate_max: 6.0
+    rapid_speech_threshold: 7.5  # Dysregulation indicator
+    slow_speech_threshold: 2.0
+    
+    # Pause patterns (seconds)
+    normal_pause_min: 0.2
+    normal_pause_max: 2.0
+    excessive_pause_threshold: 3.0
+    
+    # Pitch variance (Hz std)
+    normal_pitch_std_min: 15.0
+    normal_pitch_std_max: 50.0
+    high_pitch_variance_threshold: 70.0  # Potential instability
+    
+    # Energy variance (dB)
+    normal_energy_std: 8.0
+    high_energy_variance_threshold: 15.0
+    
+  # Instability Detection
+  instability:
+    # Sliding window parameters
+    window_duration_sec: 5.0  # Analyze 5-second chunks
+    hop_duration_sec: 2.5     # 50% overlap
+    
+    # Feature z-score thresholds (standard deviations from baseline)
+    speech_rate_zscore_threshold: 2.0
+    pause_irregularity_zscore_threshold: 1.8
+    pitch_variance_zscore_threshold: 2.2
+    energy_variance_zscore_threshold: 2.0
+    
+    # Composite instability score (0-1 scale)
+    # Formula: weighted average of individual feature flags
+    instability_score_threshold: 0.6  # Flag segment if score > 0.6
+    
+    # Minimum duration for valid instability window
+    min_instability_duration_sec: 3.0
+
+# ===== SEGMENT ALIGNMENT =====
+alignment:
+  # Temporal context expansion
+  pre_context_sec: 3.0   # Add 3s before audio instability
+  post_context_sec: 3.0  # Add 3s after audio instability
+  
+  # Merge nearby segments
+  merge_gap_threshold_sec: 2.0  # Merge if < 2s apart
+  
+  # Maximum segment length (computational limit)
+  max_segment_duration_sec: 30.0
+
+# ===== VIDEO PIPELINE =====
+video:
+  # Processing parameters
+  target_fps: 5  # Downsample to 5 FPS for efficiency
+  
+  # MediaPipe Face Mesh
+  face:
+    # Head pose angles (degrees)
+    normal_head_yaw_max: 25.0
+    normal_head_pitch_max: 20.0
+    normal_head_roll_max: 15.0
+    
+    excessive_head_movement_threshold: 35.0  # Degrees
+    
+    # Facial motion energy (normalized pixel displacement)
+    normal_facial_motion_max: 0.05
+    high_facial_motion_threshold: 0.12
+    
+    # Gaze proxy (iris landmark variance)
+    normal_gaze_variance: 0.02
+    high_gaze_shift_threshold: 0.06
+    
+  # MediaPipe Pose
+  pose:
+    # Upper-body keypoints (shoulders, elbows, wrists)
+    normal_body_motion_max: 0.08  # Normalized displacement
+    high_body_motion_threshold: 0.20  # Motor agitation indicator
+    
+    # Hand movement velocity (pixels/frame at 5 FPS)
+    normal_hand_velocity_max: 15.0
+    high_hand_velocity_threshold: 40.0
+    
+  # Temporal Aggregation
+  temporal:
+    window_duration_sec: 5.0  # Match audio window
+    aggregation_functions:
+      - mean
+      - std
+      - max
+      - percentile_95
+
+# ===== FUSION =====
+fusion:
+  # Decision logic for multimodal agreement
+  # Conservative approach: require evidence from both modalities
+  
+  agreement_rules:
+    # Strong signal: both modalities exceed thresholds
+    strong_audio_threshold: 0.7
+    strong_video_threshold: 0.7
+    strong_confidence: 0.9
+    
+    # Moderate signal: one strong, one moderate
+    moderate_audio_threshold: 0.5
+    moderate_video_threshold: 0.5
+    moderate_confidence: 0.6
+    
+    # Weak signal: only one modality slightly elevated
+    weak_confidence: 0.3
+  
+  # Minimum confidence to report segment
+  min_reportable_confidence: 0.5
+
+# ===== SCORING =====
+scoring:
+  # Vocal Regulation Index (0-100, higher = more regulated)
+  vocal_regulation:
+    baseline_weight: 0.4  # Weight for speech rate stability
+    pause_weight: 0.3     # Weight for pause regularity
+    prosody_weight: 0.3   # Weight for pitch/energy stability
+    
+  # Motor Agitation Index (0-100, higher = more agitation)
+  motor_agitation:
+    head_motion_weight: 0.4
+    body_motion_weight: 0.4
+    hand_motion_weight: 0.2
+    
+  # Attention Stability Score (0-100, higher = more stable)
+  attention_stability:
+    head_pose_weight: 0.5   # Sustained orientation
+    gaze_proxy_weight: 0.5  # Reduced gaze shifts
+    
+  # Regulation Consistency Index (0-100, higher = more consistent)
+  # Computed via temporal autocorrelation of instability scores
+  consistency:
+    lag_window_sec: 10.0  # Compare current to 10s-ago state
+    smoothing_window: 5   # Moving average smoothing
+
+# ===== AUTISM ANALYSIS (Phase 2 - Priority 1) =====
+autism_analysis:
+  # Enable autism-specific analysis
+  enabled: true  # Set to false for general behavioral analysis only
+  
+  # Turn-taking dynamics
+  turn_taking:
+    interruption_threshold_sec: 0.5  # Overlap < 0.5s = interruption
+    typical_latency_sec: 1.0         # Typical response time
+    elevated_latency_sec: 3.0        # Elevated delay threshold
+    
+  # Eye contact detection
+  eye_contact:
+    head_facing_threshold_deg: 30.0     # Head within ±30° = facing forward
+    gaze_forward_threshold: 0.05        # Gaze variance < 0.05 = looking forward
+    min_episode_duration_sec: 0.5       # Minimum episode length
+    
+  # Stereotypy detection
+  stereotypy:
+    frequency_min_hz: 0.5               # Minimum repetition rate
+    frequency_max_hz: 5.0               # Maximum repetition rate
+    amplitude_threshold: 0.15           # Minimum movement amplitude
+    min_cycles: 3                       # Minimum number of repetitions
+    
+  # Social engagement index weights
+  social_engagement_weights:
+    eye_contact: 0.35      # Eye contact contribution
+    turn_taking: 0.30      # Turn-taking reciprocity
+    responsiveness: 0.20   # Response latency
+    attention: 0.15        # Attention stability
+
+# ===== CLINICAL ANALYSIS =====
+clinical_analysis:
+  # Enable clinical-specific analyses
+  enabled: true  # Set to false to disable
+  
+  # Stuttering/disfluency analysis
+  stuttering:
+    repetition_cycle_threshold: 0.15      # Pitch variance for repetition detection
+    prolongation_duration_sec: 0.5        # Minimum prolongation length
+    block_silence_sec: 0.3                # Minimum block duration
+    
+  # Question-response ability
+  question_response:
+    max_response_latency_sec: 10.0        # Maximum time to respond
+    min_response_duration_sec: 0.2        # Minimum response length (lowered for short responses)
+    pitch_rise_threshold_hz: 15.0         # Pitch rise for question detection (lowered for sensitivity)
+  
+  # Facial Action Units (FACS analysis)
+  facial_action_units:
+    enabled: true  # Enable for facial pattern analysis
+    intensity_threshold: 0.3              # Minimum AU intensity to consider "present" (0-1)
+    require_bilateral: true               # Require bilateral activation for symmetric AUs
+    min_confidence: 0.6                   # Minimum confidence threshold
+    track_aus:                            # Which Action Units to analyze
+      - 1   # Inner brow raiser
+      - 2   # Outer brow raiser
+      - 4   # Brow lowerer
+      - 5   # Upper lid raiser
+      - 6   # Cheek raiser
+      - 7   # Lid tightener
+      - 9   # Nose wrinkler
+      - 10  # Upper lip raiser
+      - 12  # Lip corner puller (smile)
+      - 15  # Lip corner depressor (frown)
+      - 17  # Chin raiser
+      - 20  # Lip stretcher
+      - 23  # Lip tightener
+      - 25  # Lips part
+      - 26  # Jaw drop
+
+# ===== VISUALIZATION =====
+visualization:
+  # Timeline plots
+  timeline:
+    figure_width: 16
+    figure_height: 10
+    dpi: 100
+    
+  # Segment extraction
+  segments:
+    top_n_segments: 5  # Export top 5 dysregulation clips
+    segment_padding_sec: 2.0  # Add 2s padding to clips
+    
+  # Report generation
+  report:
+    include_raw_scores: true
+    include_timeline_plot: true
+    include_segment_links: true
+    include_autism_analysis: true  # NEW: Include autism-specific metrics
+    format: html  # Options: html, pdf, markdown
