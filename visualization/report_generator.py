@@ -190,7 +190,8 @@ def _build_executive_summary(report: BehavioralReport) -> str:
     
     # Extract key metrics
     n_audio_windows = len(report.audio_windows)
-    n_video_windows = len(report.video_aggregated)
+    # Count only video windows with dysregulation (video_score >= 0.7)
+    n_video_windows = len([v for v in report.video_aggregated if hasattr(v, 'video_score') and v.video_score >= 0.7])
     n_fused_segments = len(report.fused_evidence)
     
     # High-confidence segments
@@ -207,14 +208,17 @@ def _build_executive_summary(report: BehavioralReport) -> str:
         <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="bg-blue-50 rounded-lg p-5 border border-blue-100">
                 <h3 class="font-bold text-blue-800 mb-3 flex items-center">
-                    <i class="fas fa-search-plus mr-2"></i>Analysis Coverage
+                    <i class="fas fa-search-plus mr-2"></i>Dysregulation Detection Coverage
                 </h3>
                 <ul class="space-y-2 text-sm text-blue-900">
-                    <li class="flex items-center"><i class="fas fa-check-circle text-blue-500 mr-2"></i>{n_audio_windows} audio analysis windows</li>
-                    <li class="flex items-center"><i class="fas fa-check-circle text-blue-500 mr-2"></i>{n_video_windows} video analysis windows</li>
-                    <li class="flex items-center"><i class="fas fa-check-circle text-blue-500 mr-2"></i>{n_fused_segments} multimodal fusion segments</li>
-                    <li class="flex items-center"><i class="fas fa-check-circle text-blue-500 mr-2"></i>{len(high_conf_segments)} high-confidence dysregulation segments</li>
+                    <li class="flex items-center"><i class="fas fa-microphone text-blue-500 mr-2"></i><span class="font-medium">Audio dysregulation events:</span>&nbsp;{n_audio_windows} detected</li>
+                    <li class="flex items-center"><i class="fas fa-video text-blue-500 mr-2"></i><span class="font-medium">Video dysregulation events:</span>&nbsp;{n_video_windows} detected</li>
+                    <li class="flex items-center"><i class="fas fa-layer-group text-blue-500 mr-2"></i><span class="font-medium">Multimodal fusion events:</span>&nbsp;{n_fused_segments} detected</li>
+                    <li class="flex items-center"><i class="fas fa-exclamation-triangle text-blue-500 mr-2"></i><span class="font-medium">High-confidence crises:</span>&nbsp;{len(high_conf_segments)} detected</li>
                 </ul>
+                <p class="text-xs text-blue-700 mt-3 italic border-t border-blue-200 pt-3">
+                    <i class="fas fa-info-circle mr-1"></i>Note: Clinical metrics (stuttering, turn-taking, eye contact) are analyzed separately and always processed regardless of dysregulation events.
+                </p>
             </div>
             
             <div class="bg-slate-50 rounded-lg p-5 border border-slate-200">
