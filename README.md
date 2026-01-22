@@ -6,8 +6,6 @@ A research-grade, audio-first behavioral analysis platform for post-session eval
 
 ---
 
-## SYSTEM STATUS: PRODUCTION READY
-
 **Operational Capabilities:**
 
 All three primary features have been validated through systematic testing:
