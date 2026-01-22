@@ -1,12 +1,56 @@
-# Behavior Scope - System Architecture & Documentation
+# Behavior Scope - Complete Technical Documentation
+
+**Expert Reference Guide for Clinical, Technical, and Research Personnel**
 
 ## Table of Contents
+
+### Part 1: System Foundation
 1. [System Overview](#system-overview)
 2. [Architecture](#architecture)
-3. [Workflow](#workflow)
-4. [File Structure](#file-structure)
-5. [Measurement Methods](#measurement-methods)
-6. [Report Parameters & Ranges](#report-parameters--ranges)
+3. [Core Technologies](#core-technologies)
+4. [Installation & Dependencies](#installation--dependencies)
+
+### Part 2: Pipeline Deep Dive
+5. [Audio Pipeline](#audio-pipeline)
+   - Voice Activity Detection
+   - Speaker Diarization
+   - Prosodic Feature Extraction
+   - Audio Embeddings
+   - Instability Detection
+6. [Video Pipeline](#video-pipeline)
+   - Face Analysis
+   - Pose Analysis
+   - Facial Action Units (FACS)
+   - Temporal Aggregation
+7. [Segment Alignment](#segment-alignment)
+8. [Multimodal Fusion](#multimodal-fusion)
+
+### Part 3: Scoring & Analysis
+9. [Behavioral Scoring Algorithms](#behavioral-scoring-algorithms)
+   - Vocal Regulation Index (VRI)
+   - Motor Agitation Index (MAI)
+   - Attention Stability Score (ASS)
+   - Regulation Consistency Index (RCI)
+   - Facial Affect Index (FAI)
+10. [Clinical Analysis](#clinical-analysis)
+    - Autism-Specific Metrics
+    - Stuttering/Disfluency Analysis
+    - Question-Response Analysis
+
+### Part 4: Technical Reference
+11. [File Structure & Module Documentation](#file-structure--module-documentation)
+12. [Configuration & Thresholds](#configuration--thresholds)
+13. [Measurement Methods & Formulas](#measurement-methods--formulas)
+14. [Report Generation](#report-generation)
+15. [Data Formats & Export](#data-formats--export)
+
+### Part 5: Advanced Topics
+16. [Algorithm Details](#algorithm-details)
+17. [Troubleshooting Guide](#troubleshooting-guide)
+18. [Performance Optimization](#performance-optimization)
+19. [Clinical Interpretation Guidelines](#clinical-interpretation-guidelines)
+20. [Research Applications](#research-applications)
+21. [FAQ & Common Questions](#faq--common-questions)
 
 ---
 
