@@ -610,11 +610,6 @@ python -m pytest tests/test_stuttering.py
 python -m pytest tests/test_eye_contact.py
 python -m pytest tests/test_question_response.py
 ```
-
-## License
-
-[Specify your license]
-
 ## Acknowledgments
 
 **Open-Source Technology Stack:**
