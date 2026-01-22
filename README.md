@@ -1,8 +1,8 @@
-# Behavior Scope - Clinical Edition
+# Behavior Scope
 
-## Multimodal Behavioral Regulation Analysis System with Clinical Assessment
+## Multimodal Behavioral Regulation Analysis System
 
-A research-grade, audio-first behavioral analysis platform for post-session evaluation of therapy interactions. Designed for speech-language pathologists and clinical researchers working with autism spectrum populations. Built on open-source frameworks with explainable, rule-based methodologies.
+A research-grade, audio-first behavioral analysis platform for post-session evaluation of therapy interactions. Designed for speech-language pathologists and  researchers working with autism spectrum populations. Built on open-source frameworks with explainable, rule-based methodologies.
 
 ---
 
@@ -10,7 +10,7 @@ A research-grade, audio-first behavioral analysis platform for post-session eval
 
 **Operational Capabilities:**
 
-All three primary clinical features have been validated through systematic testing:
+All three primary features have been validated through systematic testing:
 
 - **Stuttering Detection Module**: Identifies sound/syllable repetitions, prolongations, and speech blocks
 - **Eye Contact Analysis Module**: Tracks gaze patterns and social engagement during therapeutic interactions
@@ -21,11 +21,11 @@ All three primary clinical features have been validated through systematic testi
 | Test Case | Stuttering Rate | Eye Contact | Response Rate | Status |
 |-----------|----------------|-------------|---------------|---------|
 | test_short.mp4 (normal speech) | 0.0% | 100% coverage | 100% | PASS |
-| boyshutter.mp4 (clinical) | 15.9% | 100% coverage | 100% | PASS |
+| boyshutter.mp4 () | 15.9% | 100% coverage | 100% | PASS |
 
 ---
 
-## Clinical Assessment Modules
+## Assessment Modules
 
 ### Module 1: Voice Stuttering and Disfluency Analysis
 
@@ -37,7 +37,7 @@ All three primary clinical features have been validated through systematic testi
 - Disfluency rate quantification (per 100 syllables)
 - Real-time acoustic analysis (prosodic and temporal pattern recognition)
 
-**Clinical Output Example:**
+**Output Example:**
 ```
 Input Utterance: "It's a pee-pee park and kid-kid kids are running"
 Detection Results:
@@ -55,7 +55,7 @@ Detection Results:
 - Quality scoring algorithm (0-100 scale, consistency and appropriateness metrics)
 - MediaPipe Face Mesh integration (468-landmark facial tracking)
 
-**Clinical Output Example:**
+**Output Example:**
 ```
 Session Analysis: Therapy interaction video
 Results:
@@ -73,7 +73,7 @@ Results:
 - Response latency measurement (inter-turn pause duration)
 - Responsiveness Index computation (0-100 composite score)
 
-**Clinical Output Example:**
+**Output Example:**
 ```
 Exchange Analysis: "Can you tell me what you see?" → [2.0s] → "It's a park"
 Results:
@@ -83,7 +83,7 @@ Results:
   - Responsiveness Index: 100.0/100
 ```
 
-**Documentation:** Refer to [CLINICAL_ANALYSIS_GUIDE.md](CLINICAL_ANALYSIS_GUIDE.md) for comprehensive technical specifications
+**Documentation:** Refer to [_ANALYSIS_GUIDE.md](_ANALYSIS_GUIDE.md) for comprehensive technical specifications
 
 ---
 
@@ -98,11 +98,11 @@ Results:
 
 **Documentation:** Refer to [AUTISM_ANALYSIS_GUIDE.md](AUTISM_ANALYSIS_GUIDE.md) for comprehensive specifications
 
-## Clinical Use Constraints
+##Use Constraints
 
 **IMPORTANT - NON-DIAGNOSTIC TOOL:**
 - Provides quantitative behavioral observations only
-- NOT intended for medical diagnosis or clinical decision-making
+- NOT intended for medical diagnosis or  decision-making
 - Requires interpretation by qualified healthcare professionals
 - Does not perform emotion detection or medical condition classification
 
@@ -130,7 +130,7 @@ MULTIMODAL FUSION
       ↓
 BEHAVIORAL SCORING
       ↓
-CLINICAL REPORT GENERATION
+REPORT GENERATION
 ```
 
 ### Six-Stage Analysis Pipeline
@@ -155,12 +155,12 @@ CLINICAL REPORT GENERATION
 - Conservative Evidence Fusion
 - Agreement-Based Confidence Scoring
 
-**Stage 5: Behavioral Quantification** (4 core indices + clinical modules)
+**Stage 5: Behavioral Quantification** (4 core indices +  modules)
 - Vocal Regulation Index (VRI, 0-100 scale)
 - Motor Agitation Index (MAI, 0-100 scale)
 - Attention Stability Score (ASS, 0-100 scale)
 - Regulation Consistency Index (RCI, 0-100 scale)
-- **Clinical Extensions** (when enabled):
+- ** Extensions** (when enabled):
   - Stuttering Severity Index (SSI, 0-100 scale)
   - Eye Contact Quality Score (0-100 scale)
   - Question-Response Index (0-100 scale)
@@ -170,7 +170,7 @@ CLINICAL REPORT GENERATION
 **Stage 6: Output Generation** (3 modules)
 - Multimodal Timeline Visualization
 - Video Segment Export with Annotations
-- HTML Clinical Report Generation
+- HTML  Report Generation
 
 ## Installation and Setup
 
@@ -228,7 +228,7 @@ The system generates comprehensive analytical reports for each session:
 
 ```
 data/outputs/
-├── session_20260122_154725_report.html       # Main clinical report (all metrics)
+├── session_20260122_154725_report.html       # Main report (all metrics)
 ├── session_20260122_154725_timeline.png      # Multimodal timeline visualization
 ├── session_20260122_154725_scores.png        # Behavioral scores chart
 ├── session_20260122_154725_annotations.json  # Segment-level annotations
@@ -241,14 +241,14 @@ data/outputs/
 ```
 
 **Primary Outputs:**
-- **HTML Clinical Report**: Interactive dashboard with all clinical metrics, scores, and visualizations
+- **HTML  Report**: Interactive dashboard with all  metrics, scores, and visualizations
 - **Stuttering Assessment**: Disfluency events, SSI score, rate per 100 syllables
 - **Eye Contact Assessment**: Episodes detected, session coverage percentage, quality score
 - **Question-Response Assessment**: Questions detected, response rate, mean latency, responsiveness index
 - **Autism Assessment**: Turn-taking dynamics, reciprocity metrics, social engagement index
 - **Checkpoint System**: Progress saved at Stage 1 completion to avoid reprocessing on failure
 
-## Clinical Metrics Reference
+##  Metrics Reference
 
 ### Stuttering Analysis
 **Primary Output:** Stuttering Severity Index (SSI, 0-100 scale)
@@ -338,13 +338,13 @@ data/outputs/
 
 ## Configuration Management
 
-### Clinical Threshold Adjustment
+###  Threshold Adjustment
 
 Modify `configs/thresholds.yaml` to customize sensitivity parameters:
 
 ```yaml
 # Stuttering Detection
-clinical_analysis:
+_analysis:
   stuttering:
     repetition_cycle_threshold: 0.15  # Min cycle duration (seconds)
     prolongation_duration_sec: 0.5    # Min prolongation length
@@ -404,7 +404,7 @@ Behavior Scope/
 ├── main.py                      # Pipeline orchestration
 ├── requirements.txt             # Python dependencies
 ├── configs/
-│   └── thresholds.yaml          # Clinical threshold parameters
+│   └── thresholds.yaml          #  threshold parameters
 ├── audio_pipeline/              # Stage 1: Audio signal processing
 │   ├── vad.py                   #   Voice activity detection
 │   ├── diarization.py           #   Speaker separation
@@ -425,7 +425,7 @@ Behavior Scope/
 │   ├── motor_agitation.py       #   MAI computation
 │   ├── attention_stability.py   #   ASS computation
 │   └── consistency.py           #   RCI computation
-├── clinical_analysis/           # Clinical assessment modules
+├── _analysis/           #  assessment modules
 │   ├── stuttering.py            #   Disfluency detection
 │   ├── question_response.py     #   Q&A analysis
 │   └── eye_contact.py           #   Eye contact tracking
@@ -457,8 +457,8 @@ Behavior Scope/
 2. **Temporal Alignment** → Audio timestamp mapping to video frame indices
 3. **Video Analysis** → Face and pose tracking during speech segments
 4. **Multimodal Fusion** → Audio-visual evidence combination
-5. **Clinical Scoring** → Metric computation (stuttering, eye contact, responsiveness)
-6. **Report Generation** → HTML clinical report with interactive visualizations
+5. ** Scoring** → Metric computation (stuttering, eye contact, responsiveness)
+6. **Report Generation** → HTML  report with interactive visualizations
 
 ### Audio Processing Technology Stack
 - **Voice Activity Detection:** Silero VAD (torch.hub) with energy-based fallback
@@ -486,11 +486,11 @@ Behavior Scope/
 **Fallback Rationale:**
 - pyannote.audio requires torchcodec (Windows compatibility limitations)
 - Fallback mode maintains operational capability without external service dependencies
-- Suitable for structured clinical interactions with predictable turn-taking
+- Suitable for structured  interactions with predictable turn-taking
 
-### Clinical Feature Technical Implementation
+###  Feature Technical Implementation
 
-**Stuttering Detection Algorithm (clinical_analysis/stuttering.py):**
+**Stuttering Detection Algorithm (_analysis/stuttering.py):**
 ```python
 # Five-stage detection pipeline:
 1. Prosodic feature extraction (pitch, energy, speaking rate)
@@ -509,7 +509,7 @@ Behavior Scope/
 4. Episode grouping (minimum duration: >0.5s)
 ```
 
-**Question-Response Matching Algorithm (clinical_analysis/question_response.py):**
+**Question-Response Matching Algorithm (_analysis/question_response.py):**
 ```python
 # Five-stage matching pipeline:
 1. Question detection (terminal pitch rise >15Hz)
@@ -519,16 +519,16 @@ Behavior Scope/
 5. Responsiveness Index computation
 ```
 
-## Clinical Threshold Rationale
+##  Threshold Rationale
 
-All detection parameters are based on clinical literature and empirical validation:
+All detection parameters are based on  literature and empirical validation:
 
 - **Speech rate deviation >2 SD:** Indicates agitation (rapid) or withdrawal (slow)
 - **Pause irregularity:** Associated with processing difficulty or uncertainty
 - **Pitch variance:** Correlates with emotional dysregulation
 - **Head motion >35°:** Indicates restlessness or attention shifts
 - **Body motion >0.2:** Suggests motor agitation or inability to maintain stillness
-- **Conservative fusion:** Prioritizes specificity to minimize false positives in clinical contexts
+- **Conservative fusion:** Prioritizes specificity to minimize false positives in  contexts
 
 ## Development Documentation
 
@@ -536,7 +536,7 @@ All detection parameters are based on clinical literature and empirical validati
 
 **Major System Improvements:**
 1. Improved speaker diarization (silence-based turn detection fallback)
-2. Lowered clinical thresholds for enhanced sensitivity:
+2. Lowered  thresholds for enhanced sensitivity:
    - Question pitch rise: 30Hz → 15Hz
    - Minimum response duration: 0.5s → 0.2s  
    - Minimum question duration: 1.0s → 0.5s
@@ -551,9 +551,9 @@ All detection parameters are based on clinical literature and empirical validati
 
 ### Architectural Design Rationale
 1. **Audio-first processing paradigm:** Audio signals typically precede visual manifestations in behavioral dysregulation
-2. **Rule-based detection:** Fully explainable methodology (no black-box ML) for clinical trust and transparency
+2. **Rule-based detection:** Fully explainable methodology (no black-box ML) for  trust and transparency
 3. **Fallback mechanisms:** Graceful degradation when advanced features unavailable
-4. **Conservative fusion:** Minimizes false positives for clinical safety
+4. **Conservative fusion:** Minimizes false positives for  safety
 5. **Modular architecture:** Independent stage execution facilitates debugging and maintenance
 
 ### System Limitations
@@ -578,7 +578,7 @@ All detection parameters are based on clinical literature and empirical validati
 **Completed Implementation:**
 - Core behavioral regulation indices (VRI, MAI, ASS, RCI)
 - Autism-specific analysis modules (turn-taking, stereotypy, social engagement)
-- Clinical assessment features (stuttering, eye contact, question-response)
+-  assessment features (stuttering, eye contact, question-response)
 - HTML report generation with interactive visualizations
 - Checkpoint system for long video processing
 - Fallback mechanisms for robust operation
@@ -589,7 +589,7 @@ All detection parameters are based on clinical literature and empirical validati
 - Longitudinal tracking (multi-session comparison)
 - Enhanced stuttering classification (interjections, word revisions)
 - Emotion prosody analysis (affect detection)
-- Clinical software export formats (FHIR, HL7)
+-  software export formats (FHIR, HL7)
 - GPU acceleration for reduced processing time
 - Web-based interface for deployment
 
@@ -636,7 +636,7 @@ python -m pytest tests/test_question_response.py
 
 ## Support Resources
 
-**Clinical Guidance:** Consult qualified speech-language pathologists or clinical psychologists for interpretation  
+** Guidance:** Consult qualified speech-language pathologists or  psychologists for interpretation  
 **Technical Support:** Submit issues via GitHub repository (if public) or contact development team  
 **Feature Proposals:** Contribute through pull requests or formal feature proposals
 
@@ -644,10 +644,10 @@ python -m pytest tests/test_question_response.py
 
 ## Legal Disclaimers
 
-**CLINICAL USE WARNING:**
+** USE WARNING:**
 - This system provides **behavioral observations only**
-- **NOT intended for medical diagnosis** or clinical decision-making
-- **NOT FDA-approved** or clinically validated for diagnostic purposes
+- **NOT intended for medical diagnosis** or  decision-making
+- **NOT FDA-approved** or ly validated for diagnostic purposes
 - Requires interpretation by **qualified healthcare professionals**
 - Does NOT perform emotion detection, mental state assessment, or medical condition diagnosis
 - Results should be used as **supplementary observational data** only
@@ -663,15 +663,15 @@ python -m pytest tests/test_question_response.py
 - Performance may vary with accented speech or atypical presentations
 - Optimized for one-on-one therapeutic sessions (two-speaker scenarios)
 - Videos shorter than 10 seconds may produce incomplete metrics
-- Not validated for populations outside autism and speech therapy clinical contexts
+- Not validated for populations outside autism and speech therapy  contexts
 
 ---
 
-**IMPORTANT:** This tool augments clinical observation and does not replace professional clinical judgment. Always involve qualified clinicians in result interpretation and clinical decision-making processes.
+**IMPORTANT:** This tool augments  observation and does not replace professional  judgment. Always involve qualified clinicians in result interpretation and  decision-making processes.
 
 ---
 
 **Version:** 2.0 (Phase 2 Production Release)  
 **Last Updated:** January 22, 2026  
-**Status:** PRODUCTION READY (All Clinical Features Validated)
+**Status:** PRODUCTION READY (All  Features Validated)
 
