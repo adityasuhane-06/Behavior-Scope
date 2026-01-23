@@ -1073,24 +1073,30 @@ def _build_autism_section(report: BehavioralReport) -> str:
                 <div class="text-3xl font-bold {eye_color_class} mb-4">{eye_score:.1f}/100</div>
                 <div class="space-y-2 mb-4 text-sm text-slate-600">
                     <div class="flex justify-between border-b border-slate-100 pb-1">
-                        <span class="text-slate-500">Session Coverage:</span> 
+                        <span class="text-slate-500">Session Coverage:</span>
                         <span class="font-medium text-right">{eye_pct}</span>
                     </div>
                     <div class="flex justify-between border-b border-slate-100 pb-1">
-                        <span class="text-slate-500">Episodes:</span> 
+                        <span class="text-slate-500">Episodes:</span>
                         <span class="font-medium text-right">{eye_episodes}</span>
                     </div>
                     <div class="flex justify-between border-b border-slate-100 pb-1">
-                        <span class="text-slate-500">During Speaking:</span> 
+                        <span class="text-slate-500">During Speaking:</span>
                         <span class="font-medium text-right">{(eye.during_speaking_percentage if eye else 0.0):.1f}%</span>
                     </div>
                     <div class="flex justify-between">
-                        <span class="text-slate-500">During Listening:</span> 
+                        <span class="text-slate-500">During Listening:</span>
                         <span class="font-medium text-right">{(eye.during_listening_percentage if eye else 0.0):.1f}%</span>
                     </div>
                 </div>
                 <p class="text-sm text-slate-500 italic border-l-2 border-slate-200 pl-3">{eye_interp}</p>
             </div>
+        </div>
+
+        <!-- Eye Contact Timeline Section -->
+        {_build_eye_contact_timeline(eye) if eye and eye.episode_count > 0 else ""}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-0">
             
             <!-- Stereotypy -->
             <div class="bg-slate-50 rounded-lg p-5 border border-slate-100">
@@ -1131,17 +1137,95 @@ def _build_autism_section(report: BehavioralReport) -> str:
     """
 
 
+def _build_eye_contact_timeline(eye_contact_analysis) -> str:
+    """Build eye contact timeline section showing when eye contact occurred."""
+
+    if not eye_contact_analysis or not eye_contact_analysis.events:
+        return ""
+
+    # Get top 10 longest eye contact episodes
+    top_episodes = sorted(
+        eye_contact_analysis.events,
+        key=lambda e: e.duration,
+        reverse=True
+    )[:10]
+
+    timeline_html = """
+    <div class="mt-6 bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-5 py-3 border-b border-slate-200">
+            <h3 class="font-bold text-slate-800 flex items-center text-sm">
+                <i class="fas fa-clock text-blue-600 mr-2"></i>Eye Contact Episodes Timeline
+                <span class="ml-2 text-xs font-normal text-slate-500">(Top 10 by duration)</span>
+            </h3>
+        </div>
+        <div class="p-5">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">#</th>
+                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Time Period</th>
+                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Duration</th>
+                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Context</th>
+                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Confidence</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-slate-200">
+    """
+
+    for idx, episode in enumerate(top_episodes, 1):
+        # Determine context badges
+        context_badges = []
+        if episode.during_speaking:
+            context_badges.append('<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"><i class="fas fa-comment mr-1"></i>Speaking</span>')
+        if episode.during_listening:
+            context_badges.append('<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800"><i class="fas fa-headphones mr-1"></i>Listening</span>')
+        if not context_badges:
+            context_badges.append('<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">-</span>')
+
+        context_html = ' '.join(context_badges)
+
+        # Confidence badge
+        conf_pct = episode.confidence * 100
+        if conf_pct >= 80:
+            conf_badge = f'<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{conf_pct:.0f}%</span>'
+        elif conf_pct >= 60:
+            conf_badge = f'<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">{conf_pct:.0f}%</span>'
+        else:
+            conf_badge = f'<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">{conf_pct:.0f}%</span>'
+
+        timeline_html += f"""
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900">{idx}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-700 font-mono">{_format_time_range(episode.start_time, episode.end_time)}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-slate-900">{episode.duration:.2f}s</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm">{context_html}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm">{conf_badge}</td>
+                    </tr>
+        """
+
+    timeline_html += """
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    """
+
+    return timeline_html
+
+
 def _get_score_color_class(score: float, inverted: bool = False) -> str:
     """
     Get color class for score display.
-    
+
     Args:
         score: Score value (0-100)
         inverted: If True, lower scores are better (e.g., stereotypy intensity)
     """
     if inverted:
         score = 100 - score
-    
+
     if score >= 70:
         return "text-emerald-500 bg-emerald-50 px-2 rounded"  # Green (good)
     elif score >= 50:

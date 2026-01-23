@@ -137,24 +137,27 @@ def analyze_eye_contact(
     frequency = (episode_count / session_duration * 60) if session_duration > 0 else 0.0
     percentage = (total_duration / session_duration * 100) if session_duration > 0 else 0.0
     
-    # Context-specific percentages
-    speaking_events = [e for e in events if e.during_speaking]
-    listening_events = [e for e in events if e.during_listening]
-    
-    speaking_duration = sum(e.duration for e in speaking_events)
-    listening_duration = sum(e.duration for e in listening_events)
-    
-    # Estimate speaking/listening time from turn analysis if available
+    # Context-specific percentages - calculate actual overlap durations
     if turn_analysis:
+        speaking_duration = _calculate_overlap_duration(events, turn_analysis.turn_events, 'child')
+        listening_duration = _calculate_overlap_duration(events, turn_analysis.turn_events, 'therapist')
+
         total_speaking = turn_analysis.child_speaking_time
         total_listening = turn_analysis.therapist_speaking_time
     else:
+        # Without turn analysis, use simplified calculation
+        speaking_events = [e for e in events if e.during_speaking]
+        listening_events = [e for e in events if e.during_listening]
+
+        speaking_duration = sum(e.duration for e in speaking_events)
+        listening_duration = sum(e.duration for e in listening_events)
+
         # Rough estimate: 50/50
         total_speaking = session_duration / 2
         total_listening = session_duration / 2
-    
-    speaking_pct = (speaking_duration / total_speaking * 100) if total_speaking > 0 else 0.0
-    listening_pct = (listening_duration / total_listening * 100) if total_listening > 0 else 0.0
+
+    speaking_pct = min((speaking_duration / total_speaking * 100), 100.0) if total_speaking > 0 else 0.0
+    listening_pct = min((listening_duration / total_listening * 100), 100.0) if total_listening > 0 else 0.0
     
     longest = max([e.duration for e in events]) if events else 0.0
     
@@ -302,6 +305,44 @@ def _extract_eye_contact_events(
     return events
 
 
+def _calculate_overlap_duration(
+    eye_contact_events: List[EyeContactEvent],
+    turn_events: List,
+    speaker: str
+) -> float:
+    """
+    Calculate total duration of eye contact that overlaps with a specific speaker's turns.
+
+    This properly handles partial overlaps to avoid counting eye contact duration
+    that extends beyond speaking periods.
+
+    Args:
+        eye_contact_events: List of eye contact events
+        turn_events: List of turn-taking events
+        speaker: 'child' or 'therapist'
+
+    Returns:
+        Total overlap duration in seconds
+    """
+    total_overlap = 0.0
+
+    # Get all turns for the specified speaker
+    speaker_turns = [turn for turn in turn_events if turn.speaker == speaker]
+
+    # For each eye contact event, calculate overlap with each speaking turn
+    for ec_event in eye_contact_events:
+        for turn in speaker_turns:
+            # Calculate overlap between [ec_start, ec_end] and [turn_start, turn_end]
+            overlap_start = max(ec_event.start_time, turn.start_time)
+            overlap_end = min(ec_event.end_time, turn.end_time)
+
+            # If there's actual overlap, add it
+            if overlap_start < overlap_end:
+                total_overlap += (overlap_end - overlap_start)
+
+    return total_overlap
+
+
 def _get_speaking_context(
     start_time: float,
     end_time: float,
@@ -312,11 +353,11 @@ def _get_speaking_context(
     """
     if turn_analysis is None:
         return False, False
-    
+
     # Check overlap with turns
     child_speaking = False
     therapist_speaking = False
-    
+
     for turn in turn_analysis.turn_events:
         # Check overlap
         if not (turn.end_time <= start_time or turn.start_time >= end_time):
@@ -324,7 +365,7 @@ def _get_speaking_context(
                 child_speaking = True
             else:
                 therapist_speaking = True
-    
+
     return child_speaking, therapist_speaking
 
 

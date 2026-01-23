@@ -244,12 +244,17 @@ def run_pipeline(video_path: str, config: Dict, output_dir: str):
         hop_duration=config['video']['temporal']['window_duration_sec'] / 2,  # 50% overlap
         aggregation_functions=config['video']['temporal']['aggregation_functions']
     )
-    
+
+    # Get original video FPS for accurate timestamp calculation
+    with VideoReader(video_path) as video_reader:
+        original_fps = video_reader.original_fps
+    logger.info(f"Original video FPS: {original_fps:.2f}")
+
     # Analyze each video segment
     logger.info("Analyzing video segments...")
     video_aggregated = []
     facial_au_sequence = []  # Store facial AUs for all segments
-    
+
     for segment in expanded_segments:
         logger.info(f"Processing segment [{segment.start_time:.1f}s - {segment.end_time:.1f}s]")
         
@@ -265,11 +270,11 @@ def run_pipeline(video_path: str, config: Dict, output_dir: str):
             logger.warning(f"No frames extracted for segment")
             continue
         
-        # Analyze face features
-        face_features_list = analyze_face_segment(frames, segment.start_frame, fps=config['video']['target_fps'])
-        
-        # Analyze pose features
-        pose_features_list = analyze_pose_segment(frames, segment.start_frame, fps=config['video']['target_fps'])
+        # Analyze face features (use original_fps for accurate timestamps)
+        face_features_list = analyze_face_segment(frames, segment.start_frame, fps=original_fps)
+
+        # Analyze pose features (use original_fps for accurate timestamps)
+        pose_features_list = analyze_pose_segment(frames, segment.start_frame, fps=original_fps)
         
         # Analyze Facial Action Units (if enabled)
         if config.get('clinical_analysis', {}).get('facial_action_units', {}).get('enabled', False):
@@ -299,7 +304,7 @@ def run_pipeline(video_path: str, config: Dict, output_dir: str):
             
             for i, frame in enumerate(frames):
                 frame_idx = segment.start_frame + i
-                timestamp = frame_idx / config['video']['target_fps']
+                timestamp = frame_idx / original_fps  # Use original FPS for accurate timestamps
                 
                 # MediaPipe Face Mesh expects BGR format (OpenCV native format)
                 # Do NOT convert to RGB despite what documentation says
@@ -324,11 +329,11 @@ def run_pipeline(video_path: str, config: Dict, output_dir: str):
             segment_aus_count = len([au for au in facial_au_sequence if au.timestamp >= segment.start_time and au.timestamp <= segment.end_time])
             logger.info(f"  Extracted {segment_aus_count} facial AU frames from segment")
         
-        # Temporal aggregation
+        # Temporal aggregation (fps parameter not used by aggregator, but kept for API compatibility)
         aggregated = temporal_aggregator.aggregate(
             face_features_list,
             pose_features_list,
-            fps=config['video']['target_fps']
+            fps=original_fps
         )
         video_aggregated.extend(aggregated)  # extend instead of append since aggregate returns a list
     
