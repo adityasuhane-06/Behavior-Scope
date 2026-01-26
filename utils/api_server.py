@@ -817,12 +817,15 @@ async def get_eye_contact_audit(session_id: str):
             
             # FIX: Also handle case where eye_contact_pct is 0 but we have total_frames (empty gaze data)
             if not gaze_direction_summary and total_frames > 0:
-                # Default to direct eye contact for 100% of session when we have no other data
-                gaze_direction_summary["direct_eye_contact"] = {
-                    "direction": "direct_eye_contact",
+                # Default based on the eye contact score. If score is low/zero, assume Looking Away.
+                # Previously this incorrectly defaulted to 100% Direct Eye Contact.
+                target_dir = "direct_eye_contact" if eye_contact_pct >= 50 else "looking_away"
+                
+                gaze_direction_summary[target_dir] = {
+                    "direction": target_dir,
                     "total_duration": (total_frames / 24.0),
                     "frame_count": total_frames,
-                    "percentage_of_session": 100.0,  # Assume 100% when no other data
+                    "percentage_of_session": 100.0,
                     "average_confidence": avg_confidence,
                     "episodes": []
                 }

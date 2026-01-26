@@ -8,21 +8,19 @@ approaches and manages threshold configurations.
 import logging
 from typing import List, Dict, Optional, Any
 import numpy as np
+import cv2
 
 from ..core.interfaces import DetectionEngine
 from ..core.data_models import FrameResult, GazeVector, ThresholdConfig
 from ..core.enums import DetectionApproach, QualityFlag, GazeTarget
+from .l2cs_gaze import L2CSGazeEstimator
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 
 class DetectionEngineImpl(DetectionEngine):
-    """
-    Main detection engine implementation.
-    
-    Orchestrates multiple detection approaches and manages configuration.
-    Integrates with existing MediaPipe and AI-enhanced detection methods.
-    """
+
     
     def __init__(self):
         """Initialize the detection engine."""
@@ -40,6 +38,21 @@ class DetectionEngineImpl(DetectionEngine):
         self._mediapipe_detector = None
         self._ai_enhanced_detector = None
         self._initialize_detectors()
+        
+        # Initialize Deep Learning Gaze Model (L2CS)
+        try:
+            # Assume running from project root or relative
+            # Find root: go up from 'detection/detection_engine.py' -> 'enhanced_...' -> 'root'
+            current_dir = Path(__file__).parent
+            project_root = current_dir.parent.parent
+            model_path = project_root / "data" / "models" / "L2CSNet_gaze360.pkl"
+            
+            self._l2cs_estimator = L2CSGazeEstimator(str(model_path))
+        except Exception as e:
+            logger.warning(f"Failed to init L2CS: {e}")
+            self._l2cs_estimator = None
+
+
     
     def _initialize_detectors(self):
         """Initialize integration with existing detection systems."""
@@ -77,14 +90,20 @@ class DetectionEngineImpl(DetectionEngine):
     def process_frame(self, frame: Any, timestamp: float) -> FrameResult:
         """Process a single video frame and return detection result."""
         try:
+            # Extract frame array if input is dict
+            if isinstance(frame, dict):
+                 frame_array = frame.get('data')
+            else:
+                 frame_array = frame
+
             # Extract face features from frame (integrate with existing pipeline)
             face_features = self._extract_face_features(frame)
             
             if face_features is None:
                 return self._create_failed_frame_result(timestamp, "Face detection failed")
             
-            # Calculate gaze vector
-            gaze_vector = self._calculate_gaze_vector(face_features, timestamp)
+            # Calculate gaze vector (pass raw frame for L2CS)
+            gaze_vector = self._calculate_gaze_vector(face_features, timestamp, frame_array)
             
             # Apply detection approach
             confidence_score = self._calculate_confidence_score(face_features, gaze_vector)
@@ -143,6 +162,10 @@ class DetectionEngineImpl(DetectionEngine):
             
             # Use real face analyzer from video_pipeline
             try:
+                # Force fallback to MediaPipe if L2CS is active (we need landmarks/bbox which FaceAnalyzer might not provide)
+                if hasattr(self, '_l2cs_estimator') and self._l2cs_estimator and self._l2cs_estimator.active:
+                    raise ImportError("Force usage of internal MediaPipe for L2CS BBox")
+
                 from video_pipeline.face_analyzer import FaceAnalyzer
                 
                 # Initialize face analyzer if not already done
@@ -192,6 +215,7 @@ class DetectionEngineImpl(DetectionEngine):
         """Fallback face detection when FaceAnalyzer is not available."""
         try:
             import mediapipe as mp
+            import cv2
             
             # Initialize MediaPipe Face Detection
             if not hasattr(self, '_mp_face_mesh') or self._mp_face_mesh is None:
@@ -202,8 +226,16 @@ class DetectionEngineImpl(DetectionEngine):
                     min_detection_confidence=0.5
                 )
             
+            # Convert to RGB for MediaPipe (it expects RGB, OpenCV gives BGR)
+            frame_rgb = frame_array
+            try:
+                if len(frame_array.shape) == 3 and frame_array.shape[2] == 3:
+                     frame_rgb = cv2.cvtColor(frame_array, cv2.COLOR_BGR2RGB)
+            except Exception:
+                pass # Best effort
+                
             # Process frame
-            results = self._mp_face_mesh.process(frame_array)
+            results = self._mp_face_mesh.process(frame_rgb)
             
             if results.multi_face_landmarks:
                 face_landmarks = results.multi_face_landmarks[0]
@@ -254,43 +286,85 @@ class DetectionEngineImpl(DetectionEngine):
             return None
 
     
-    def _calculate_gaze_vector(self, face_features: Dict[str, Any], timestamp: float) -> Optional[GazeVector]:
-        """Calculate 3D gaze vector from face features."""
+    def _calculate_gaze_vector(self, face_features: Dict[str, Any], timestamp: float, frame_array: Optional[np.ndarray] = None) -> Optional[GazeVector]:
+
         try:
             if not face_features.get('face_detected', False):
                 return None
             
-            head_pose = face_features.get('head_pose', (0.0, 0.0, 0.0))
+            head_pose = face_features.get('head_pose', (0.0, 0.0, 0.0)) # Yaw, Pitch, Roll
+            landmarks = face_features.get('landmarks')
+            
+            # Debugging why L2CS is skipped
+            l2cs_active = self._l2cs_estimator and self._l2cs_estimator.active
+            has_frame = frame_array is not None
+            has_landmarks = landmarks is not None
+            # print(f"DEBUG COND: L2CS={l2cs_active}, Frame={has_frame}, Landmarks={has_landmarks}")
+            
+            # --- PRIORITY 0: Deep Learning (L2CS) ---
+            if l2cs_active and has_frame and has_landmarks:
+                try:
+                    h, w = frame_array.shape[:2]
+                    xs, ys = landmarks[:, 0], landmarks[:, 1]
+                    x1, x2 = np.min(xs), np.max(xs)
+                    y1, y2 = np.min(ys), np.max(ys)
+                    if x2 <= 1.0 and w > 1: # Handle normalized
+                        x1*=w; x2*=w; y1*=h; y2*=h
+                    
+                    
+                    bbox = [int(x1), int(max(0, y1)), int(x2), int(y2)]
+                    # print(f"DEBUG L2CS Input: Frame={frame_array.shape if frame_array is not None else 'None'}, BBox={bbox}")
+                    
+                    frame_rgb = cv2.cvtColor(frame_array, cv2.COLOR_BGR2RGB) if (len(frame_array.shape)==3 and frame_array.shape[2]==3) else frame_array
+                    
+                    l2cs_yaw, l2cs_pitch = self._l2cs_estimator.estimate_gaze(frame_rgb, bbox)
+                    if l2cs_yaw is not None:
+                        gaze_x = -np.sin(l2cs_yaw)
+                        gaze_y = -np.sin(l2cs_pitch)
+                        gaze_z = np.cos(l2cs_yaw) * np.cos(l2cs_pitch)
+                        mag = np.sqrt(gaze_x**2 + gaze_y**2 + gaze_z**2)
+                        return GazeVector(x=gaze_x/mag, y=gaze_y/mag, z=gaze_z/mag, confidence=0.95, timestamp=timestamp)
+                except Exception as e:
+                    # print(f"L2CS FAILURE: {e}")
+                    pass
+
+
             landmarks = face_features.get('landmarks')
             confidence = face_features.get('confidence', 0.0)
             
-            if landmarks is None:
-                return None
-            
-            # Simplified gaze estimation (in real implementation, this would use
-            # proper 3D gaze estimation algorithms)
             yaw, pitch, roll = head_pose
             
-            # Convert head pose to gaze direction (simplified)
-            # In real implementation, this would use eye landmarks for precise gaze
-            gaze_x = np.sin(np.radians(yaw))
-            gaze_y = -np.sin(np.radians(pitch))  # Negative because screen Y is inverted
-            gaze_z = np.cos(np.radians(yaw)) * np.cos(np.radians(pitch))
+            # Default to Head Gaze (Fallback Logic COMMENTED OUT)
+            # gaze_yaw = yaw
+            # gaze_pitch = pitch
             
-            # Normalize to unit vector
-            magnitude = np.sqrt(gaze_x**2 + gaze_y**2 + gaze_z**2)
-            if magnitude > 0:
-                gaze_x /= magnitude
-                gaze_y /= magnitude
-                gaze_z /= magnitude
+            # # If Iris landmarks available (Refined Face Mesh), calculate Eye Gaze
+            # if landmarks is not None and len(landmarks) >= 478:
+                 # ... (Iris Logic commented out) ...
+            #     pass
+
+            # # Convert final angles to vector
+            # gaze_x = np.sin(np.radians(gaze_yaw))
+            # gaze_y = -np.sin(np.radians(gaze_pitch))
+            # gaze_z = np.cos(np.radians(gaze_yaw)) * np.cos(np.radians(gaze_pitch))
             
-            return GazeVector(
-                x=gaze_x,
-                y=gaze_y,
-                z=gaze_z,
-                confidence=confidence,
-                timestamp=timestamp
-            )
+            # # Normalize
+            # magnitude = np.sqrt(gaze_x**2 + gaze_y**2 + gaze_z**2)
+            # if magnitude > 0:
+            #     gaze_x /= magnitude
+            #     gaze_y /= magnitude
+            #     gaze_z /= magnitude
+            
+            # return GazeVector(
+            #     x=gaze_x,
+            #     y=gaze_y,
+            #     z=gaze_z,
+            #     confidence=confidence,
+            #     timestamp=timestamp
+            # )
+            
+            # Return None if L2CS failed and fallback is disabled
+            return None
             
         except Exception as e:
             logger.warning(f"Gaze vector calculation failed: {e}")

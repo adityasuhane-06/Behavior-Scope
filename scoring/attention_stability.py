@@ -11,26 +11,46 @@ Score interpretation:
 - 60-79: Moderately stable attention
 - 40-59: Variable attention (frequent shifts)
 - 0-39: Unstable attention (difficulty maintaining focus)
-
-Clinical rationale:
-- Sustained head orientation → maintained attention
-- Reduced gaze shifts → focused processing
-- Consistent detection → engagement with session
-- Frequent orientation changes → attention dysregulation
-
-Engineering approach:
-- Head pose variance (lower = more stable)
-- Gaze proxy variance (lower = more stable)
-- Detection rate (higher = more present)
-- Inverted and normalized to 0-100 scale
 """
 
 import logging
-from typing import List, Dict
-
+from typing import List, Dict, Tuple, Any, Optional
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_val(feat_dict: Dict, key: str, metric: str) -> float:
+    """
+    Safely extract statistical value from feature dictionary.
+    Handles both nested (ImprovedAggregator) and flat (Legacy) structures.
+    """
+    if not isinstance(feat_dict, dict):
+        return 0.0
+    
+    # Try nested structure (ImprovedAggregator style)
+    # e.g., feat_dict['head_yaw']['mean']
+    if key in feat_dict:
+        val = feat_dict[key]
+        if isinstance(val, dict):
+            v = val.get(metric, 0.0)
+            return float(v) if v is not None else 0.0
+        
+        # Fallback for scalar legacy values if metric is 'mean'
+        if metric == 'mean':
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                pass
+
+    # Try flat key (Legacy style)
+    # e.g., feat_dict['head_yaw_mean']
+    flat_key = f"{key}_{metric}"
+    if flat_key in feat_dict:
+        v = feat_dict[flat_key]
+        return float(v) if v is not None else 0.0
+        
+    return 0.0
 
 
 def compute_attention_stability_score(
@@ -41,19 +61,15 @@ def compute_attention_stability_score(
     Compute Attention Stability Score from video features.
     
     Formula:
-        ASS = 100 * weighted_avg(head_pose_stability, gaze_stability, presence)
+        ASS = Base Stability * Presence Factor
+        Base Stability = 0.5 * HeadStability + 0.5 * GazeStability
     
     Args:
-        video_aggregated: List of AggregatedFeatures from video pipeline
+        video_aggregated: List of AggregatedFeatures (windows)
         config: Configuration dict with weights
         
     Returns:
-        Dictionary with:
-        - score: Overall ASS (0-100)
-        - head_pose_stability: Head orientation consistency (0-100)
-        - gaze_stability: Gaze steadiness (0-100)
-        - presence_score: Detection consistency (0-100)
-        - explanation: Human-readable interpretation
+        Dictionary with scores and raw metrics.
     """
     if not video_aggregated:
         logger.warning("Empty video features")
@@ -62,6 +78,8 @@ def compute_attention_stability_score(
             'head_pose_stability': 50.0,
             'gaze_stability': 50.0,
             'presence_score': 50.0,
+            'raw_head_variance': 0.0,
+            'raw_gaze_variance': 0.0,
             'explanation': "Insufficient data for attention stability assessment"
         }
     
@@ -73,17 +91,18 @@ def compute_attention_stability_score(
     weight_gaze = scoring_config.get('gaze_proxy_weight', 0.5)
     
     # Compute subcomponents
-    head_stability = _compute_head_pose_stability(video_aggregated)
-    gaze_stability = _compute_gaze_stability(video_aggregated)
+    head_stability, raw_head_var = _compute_head_pose_stability(video_aggregated)
+    gaze_stability, raw_gaze_var = _compute_gaze_stability(video_aggregated)
     presence = _compute_presence_score(video_aggregated)
     
-    # Weighted combination (include presence as modifier)
+    # Weighted combination for base stability
     base_score = (
         weight_head * head_stability +
         weight_gaze * gaze_stability
     )
     
     # Adjust by presence (penalize if frequently out of frame)
+    # Formula: Score scales down to 50% if presence is 0
     overall_score = base_score * (0.5 + 0.5 * presence / 100.0)
     
     # Generate explanation
@@ -101,117 +120,129 @@ def compute_attention_stability_score(
         'head_pose_stability': float(head_stability),
         'gaze_stability': float(gaze_stability),
         'presence_score': float(presence),
+        'raw_head_variance': float(raw_head_var),
+        'raw_gaze_variance': float(raw_gaze_var),
         'explanation': explanation
     }
 
 
-def _compute_head_pose_stability(video_aggregated: List) -> float:
+def _compute_head_pose_stability(video_aggregated: List) -> Tuple[float, float]:
     """
     Compute head pose stability score.
     
     Method:
-    - Extract temporal variance in head pose angles
-    - Lower variance = more stable = higher score
-    - Convert to 0-100 scale (inverted)
+    - Intra-window instability: Mean of std deviations (shaking)
+    - Inter-window instability: Std deviation of means (drift)
+    - Total instability = Intra + Inter
+    
+    Returns: (score, raw_instability_degrees)
     """
-    # Collect head pose variances across windows
-    yaw_vars = []
-    pitch_vars = []
-    roll_vars = []
+    yaw_means, yaw_stds = [], []
+    pitch_means, pitch_stds = [], []
+    roll_means, roll_stds = [], []
     
     for window in video_aggregated:
-        face_feat = window.face_features
+        ff = window.face_features
+        # Extract means and stds for all angles
+        yaw_means.append(_extract_val(ff, 'head_yaw', 'mean'))
+        yaw_stds.append(_extract_val(ff, 'head_yaw', 'std'))
         
-        # Variance of head pose angles within each window
-        yaw_vars.append(face_feat.get('head_yaw_std', 0.0))
-        pitch_vars.append(face_feat.get('head_pitch_std', 0.0))
-        roll_vars.append(face_feat.get('head_roll_std', 0.0))
+        pitch_means.append(_extract_val(ff, 'head_pitch', 'mean'))
+        pitch_stds.append(_extract_val(ff, 'head_pitch', 'std'))
+        
+        roll_means.append(_extract_val(ff, 'head_roll', 'mean'))
+        roll_stds.append(_extract_val(ff, 'head_roll', 'std'))
     
-    if not yaw_vars:
-        return 50.0
+    if not yaw_means:
+        return 50.0, 0.0
     
-    # Compute overall variance (std of std across windows)
-    yaw_instability = np.std(yaw_vars)
-    pitch_instability = np.std(pitch_vars)
-    roll_instability = np.std(roll_vars)
+    # Calculate drift (inter-window) and shake (intra-window)
+    # Yaw
+    yaw_drift = np.std(yaw_means)
+    yaw_shake = np.mean(yaw_stds)
+    yaw_instability = yaw_drift + yaw_shake
     
-    # Combined instability
+    # Pitch
+    pitch_drift = np.std(pitch_means)
+    pitch_shake = np.mean(pitch_stds)
+    pitch_instability = pitch_drift + pitch_shake
+    
+    # Roll
+    roll_drift = np.std(roll_means)
+    roll_shake = np.mean(roll_stds)
+    roll_instability = roll_drift + roll_shake
+    
+    # Average total instability across axes
     total_instability = np.mean([yaw_instability, pitch_instability, roll_instability])
     
-    # Convert to stability score
-    # Empirical: 0° instability = 100, 20° instability = 0
+    # Convert to stability score (0-100)
+    # Threshold: 20.0 degrees
+    # 0 deg = 100 score, 20 deg = 0 score
     stability_score = 100.0 * (1.0 - np.clip(total_instability / 20.0, 0.0, 1.0))
     
-    return stability_score
+    return stability_score, total_instability
 
 
-def _compute_gaze_stability(video_aggregated: List) -> float:
+def _compute_gaze_stability(video_aggregated: List) -> Tuple[float, float]:
     """
     Compute gaze stability score.
     
     Method:
-    - Extract gaze proxy variance
-    - Lower variance = more stable = higher score
+    - Intra-window var + Inter-window drift
+    
+    Returns: (score, raw_variance_equivalent)
     """
-    gaze_values = []
+    gaze_means = []
+    gaze_stds = []
     
     for window in video_aggregated:
-        face_feat = window.face_features
-        gaze = face_feat.get('gaze_proxy_mean', 0.0)
-        gaze_values.append(gaze)
+        ff = window.face_features
+        gaze_means.append(_extract_val(ff, 'gaze_proxy', 'mean'))
+        gaze_stds.append(_extract_val(ff, 'gaze_proxy', 'std'))
     
-    if not gaze_values:
-        return 50.0
+    if not gaze_means:
+        return 50.0, 0.0
     
-    # Compute variance in gaze proxy
-    gaze_variance = np.var(gaze_values)
+    # Calculate drift and shake
+    # Note: inputs are std devs, so we sum std devs
+    gaze_drift = np.std(gaze_means)
+    gaze_shake = np.mean(gaze_stds)
+    
+    # Total instability in std-dev space
+    total_instability = gaze_drift + gaze_shake
+    
+    # Convert to Variance-equivalent for scoring
+    # Threshold is "0.05 Variance"
+    total_instability_sq = total_instability ** 2
     
     # Convert to stability score
-    # Empirical: 0 variance = 100, 0.05 variance = 0
-    stability_score = 100.0 * (1.0 - np.clip(gaze_variance / 0.05, 0.0, 1.0))
+    stability_score = 100.0 * (1.0 - np.clip(total_instability_sq / 0.05, 0.0, 1.0))
     
-    return stability_score
+    return stability_score, total_instability_sq
 
 
 def _compute_presence_score(video_aggregated: List) -> float:
     """
     Compute presence/detection consistency score.
-    
-    Method:
-    - Calculate face and pose detection rates
-    - High detection = engaged and present
     """
-    face_detection_rates = []
-    pose_detection_rates = []
+    face_rates = []
+    pose_rates = []
     
     for window in video_aggregated:
-        # face_features and pose_features are already dicts
-        face_feat = window.face_features
-        pose_feat = window.pose_features
+        ff = window.face_features
+        pf = window.pose_features
         
-        # Extract detection rates from the dict
-        face_rate = face_feat.get('face_detection_rate', 0.0) if isinstance(face_feat, dict) else 0.0
-        pose_rate = pose_feat.get('pose_detection_rate', 0.0) if isinstance(pose_feat, dict) else 0.0
-        
-        face_detection_rates.append(face_rate)
-        pose_detection_rates.append(pose_rate)
+        face_rates.append(_extract_val(ff, 'face_detection_rate', 'mean'))
+        pose_rates.append(_extract_val(pf, 'pose_detection_rate', 'mean'))
     
-    if not face_detection_rates:
+    if not face_rates:
         return 50.0
     
-    # Filter out non-numeric values and ensure we have valid data
-    valid_face_rates = [r for r in face_detection_rates if isinstance(r, (int, float)) and not np.isnan(r)]
-    valid_pose_rates = [r for r in pose_detection_rates if isinstance(r, (int, float)) and not np.isnan(r)]
+    mean_face = np.mean(face_rates)
+    mean_pose = np.mean(pose_rates)
     
-    if not valid_face_rates and not valid_pose_rates:
-        return 50.0
-    
-    # Average detection rates - use 0.0 as fallback if list is empty
-    mean_face_detection = np.mean(valid_face_rates) if valid_face_rates else 0.0
-    mean_pose_detection = np.mean(valid_pose_rates) if valid_pose_rates else 0.0
-    
-    # Combined presence score (average)
-    presence_score = 100.0 * (mean_face_detection + mean_pose_detection) / 2.0
+    # Combined presence score (0-100)
+    presence_score = 100.0 * (mean_face + mean_pose) / 2.0
     
     return presence_score
 

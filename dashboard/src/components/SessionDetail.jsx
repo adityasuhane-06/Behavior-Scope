@@ -179,26 +179,7 @@ function SessionDetail() {
                   </Paper>
                 </Grid>
               )}
-              {session.regulation_consistency_index !== null && (
-                <Grid item xs={12} md={3}>
-                  <Paper
-                    sx={{
-                      p: 2,
-                      bgcolor: 'warning.light',
-                      color: 'warning.contrastText',
-                      cursor: 'pointer',
-                      '&:hover': { boxShadow: 6, transform: 'scale(1.02)' },
-                      transition: 'all 0.2s'
-                    }}
-                    onClick={() => handleMetricClick('regulation_consistency')}
-                  >
-                    <Typography variant="h6">
-                      {session.regulation_consistency_index.toFixed(1)}/100
-                    </Typography>
-                    <Typography variant="body2">Regulation Consistency (Click for audit)</Typography>
-                  </Paper>
-                </Grid>
-              )}
+              {/* Regulation Consistency Card Removed */}
               {session.facial_affect_index !== null && (
                 <Grid item xs={12} md={3}>
                   <Paper
@@ -269,26 +250,7 @@ function SessionDetail() {
                   </Paper>
                 </Grid>
               )}
-              {session.social_engagement_index !== null && (
-                <Grid item xs={12} md={4}>
-                  <Paper
-                    sx={{
-                      p: 2,
-                      bgcolor: 'primary.light',
-                      color: 'primary.contrastText',
-                      cursor: 'pointer',
-                      '&:hover': { boxShadow: 6, transform: 'scale(1.02)' },
-                      transition: 'all 0.2s'
-                    }}
-                    onClick={() => handleMetricClick('social_engagement')}
-                  >
-                    <Typography variant="h6">
-                      {session.social_engagement_index.toFixed(1)}/100
-                    </Typography>
-                    <Typography variant="body2">Social Engagement (Click for audit)</Typography>
-                  </Paper>
-                </Grid>
-              )}
+              {/* Social Engagement Card Removed */}
             </Grid>
           </Box>
         )}
@@ -346,16 +308,16 @@ function SessionDetail() {
 
       <Paper sx={{ p: 3 }}>
         <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
-          <Tab label="Score Charts" />
-          <Tab label="Frame Analysis" />
+          {/* <Tab label="Score Charts" />
+          <Tab label="Frame Analysis" /> */}
           <Tab label="Facial Action Units" />
           <Tab label="Transcript" />
         </Tabs>
 
-        {activeTab === 0 && <ScoreCharts frames={frames} />}
-        {activeTab === 1 && <FrameViewer frames={frames} />}
-        {activeTab === 2 && <FacialActionUnitsViewer sessionId={sessionId} />}
-        {activeTab === 3 && <TranscriptViewer sessionId={sessionId} />}
+        {/* {activeTab === -2 && <ScoreCharts frames={frames} />}
+        {activeTab === -1 && <FrameViewer frames={frames} />} */}
+        {activeTab === 0 && <FacialActionUnitsViewer sessionId={sessionId} />}
+        {activeTab === 1 && <TranscriptViewer sessionId={sessionId} />}
       </Paper>
     </Box>
   );

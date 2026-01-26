@@ -503,23 +503,53 @@ function FacialActionUnitsViewer({ sessionId }) {
           ? 'Moderate mobility - Normal facial movement intensity'
           : 'Low mobility - Subtle or restricted facial movements'
       },
-      'symmetry': {
-        name: 'Facial Symmetry',
-        formula: 'Symmetry = 100 - |Left Side Activation - Right Side Activation|',
+      'flat_affect': {
+        name: 'Flat Affect',
+        formula: 'Flat Affect = (Low Diversity × 0.40) + (Low Intensity × 0.35) + (Inactive Ratio × 0.25)',
         components: [
           {
-            name: 'Left-Right Balance',
-            value: auData?.symmetry?.toFixed(2),
-            description: 'Comparison of facial movements on left vs right side',
-            calculation: 'Measured from bilateral AU activations'
+            name: 'Low Diversity',
+            value: ((1 - (auData?.most_activated_units?.length || 0) / 15) * 40).toFixed(2),
+            description: 'Inverse of expression variety, weighted by 40%',
+            calculation: '(1 - unique_aus/15) × 40'
+          },
+          {
+            name: 'Low Intensity',
+            value: ((1 - (auData?.mobility || 0) / 100) * 35).toFixed(2),
+            description: 'Inverse of movement intensity, weighted by 35%',
+            calculation: '(1 - mobility/100) × 35'
+          },
+          {
+            name: 'Inactive Score',
+            value: (25 * 0.1).toFixed(2),
+            description: 'Contribution from inactive frames, weighted by 25%',
+            calculation: 'inactive_ratio × 25'
           }
         ],
-        finalCalculation: `Symmetry = ${auData?.symmetry?.toFixed(2)}/100`,
-        interpretation: auData?.symmetry >= 80
-          ? 'Highly symmetric - Balanced facial movements'
-          : auData?.symmetry >= 60
-          ? 'Moderately symmetric - Some asymmetry present'
-          : 'Asymmetric - Notable differences between left and right sides'
+        finalCalculation: `Flat Affect = ${auData?.flat_affect?.toFixed(2)}/100`,
+        interpretation: auData?.flat_affect >= 70
+          ? 'High flat affect - Reduced facial expressiveness'
+          : auData?.flat_affect >= 40
+          ? 'Moderate flat affect - Some limitation in expressions'
+          : 'Low flat affect - Normal range of facial expressions'
+      },
+      'flat_affect_inverted': {
+        name: 'Flat Affect Inverted',
+        formula: 'Flat Affect Inverted = 100 - Flat Affect',
+        components: [
+          {
+            name: 'Flat Affect Score',
+            value: auData?.flat_affect?.toFixed(2),
+            description: 'Original flat affect score (higher = flatter)',
+            calculation: `Flat Affect = ${auData?.flat_affect?.toFixed(2)}`
+          }
+        ],
+        finalCalculation: `Flat Affect Inverted = 100 - ${auData?.flat_affect?.toFixed(2)} = ${(100 - (auData?.flat_affect || 0)).toFixed(2)}`,
+        interpretation: (100 - (auData?.flat_affect || 0)) >= 60
+          ? 'High expressiveness - Rich facial expression variety'
+          : (100 - (auData?.flat_affect || 0)) >= 40
+          ? 'Moderate expressiveness - Adequate facial expressions'
+          : 'Low expressiveness - Limited facial expression range'
       }
     };
     
@@ -570,104 +600,279 @@ function FacialActionUnitsViewer({ sessionId }) {
       <Paper sx={{ p: 3, mb: 3 }}>
         <Grid container spacing={3}>
           <Grid item xs={12} md={3}>
-            <Card 
-              sx={{ 
-                bgcolor: 'primary.light', 
-                color: 'primary.contrastText',
-                cursor: 'pointer',
-                '&:hover': { 
-                  boxShadow: 6, 
-                  transform: 'scale(1.02)',
-                },
-                transition: 'all 0.2s'
-              }}
-              onClick={() => handleMetricClick('facial_affect_index')}
+            <Tooltip
+              arrow
+              placement="top"
+              title={
+                <Box sx={{ maxWidth: 350, p: 1 }}>
+                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom color="primary">
+                    📊 Facial Affect Index (FAI)
+                  </Typography>
+                  <Divider sx={{ my: 1 }} />
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>What it measures:</strong> Overall facial expressiveness combining multiple components into a single composite score.
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>How it's calculated:</strong> Weighted average of Affect Range (33%), Mobility (27%), Flat Affect Inverted (27%), and Congruence (13%).
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Clinical significance:</strong>
+                  </Typography>
+                  <Box sx={{ fontSize: '0.8rem', ml: 1 }}>
+                    • <strong>70-100:</strong> High expressiveness - rich facial communication<br/>
+                    • <strong>40-70:</strong> Moderate - typical range<br/>
+                    • <strong>0-40:</strong> Low - may indicate flat affect or masking
+                  </Box>
+                </Box>
+              }
             >
-              <CardContent>
-                <Typography variant="h4">
-                  {auData.facial_affect_index?.toFixed(1) || 'N/A'}/100
-                </Typography>
-                <Typography variant="body2">Facial Affect Index</Typography>
-                <Typography variant="caption">
-                  Composite score reflecting facial expressiveness, mobility, and affect range
-                </Typography>
-                <Typography variant="caption" sx={{ display: 'block', mt: 1, fontStyle: 'italic' }}>
-                  Click to see formula
-                </Typography>
-              </CardContent>
-            </Card>
+              <Card 
+                sx={{ 
+                  bgcolor: 'primary.light', 
+                  color: 'primary.contrastText',
+                  cursor: 'pointer',
+                  '&:hover': { 
+                    boxShadow: 6, 
+                    transform: 'scale(1.02)',
+                  },
+                  transition: 'all 0.2s'
+                }}
+                onClick={() => handleMetricClick('facial_affect_index')}
+              >
+                <CardContent>
+                  <Typography variant="h4">
+                    {auData.facial_affect_index?.toFixed(1) || 'N/A'}/100
+                  </Typography>
+                  <Typography variant="body2">Facial Affect Index</Typography>
+                  <Typography variant="caption">
+                    Composite score reflecting facial expressiveness, mobility, and affect range
+                  </Typography>
+                  <Typography variant="caption" sx={{ display: 'block', mt: 1, fontStyle: 'italic' }}>
+                    Click to see formula
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Tooltip>
           </Grid>
           <Grid item xs={12} md={3}>
-            <Card
-              sx={{ 
-                cursor: 'pointer',
-                '&:hover': { 
-                  boxShadow: 6, 
-                  transform: 'scale(1.02)',
-                },
-                transition: 'all 0.2s'
-              }}
-              onClick={() => handleMetricClick('affect_range')}
+            <Tooltip
+              arrow
+              placement="top"
+              title={
+                <Box sx={{ maxWidth: 350, p: 1 }}>
+                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom color="primary">
+                    🎭 Affect Range
+                  </Typography>
+                  <Divider sx={{ my: 1 }} />
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>What it measures:</strong> Variety of different facial expressions shown during the session.
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>How it's calculated:</strong> (Unique AUs detected ÷ 15 possible AUs) × 100
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Clinical significance:</strong>
+                  </Typography>
+                  <Box sx={{ fontSize: '0.8rem', ml: 1 }}>
+                    • <strong>60-100:</strong> Wide variety - uses many different expressions<br/>
+                    • <strong>40-60:</strong> Moderate variety - typical range<br/>
+                    • <strong>0-40:</strong> Limited variety - restricted expression repertoire
+                  </Box>
+                  <Typography variant="caption" sx={{ display: 'block', mt: 1, fontStyle: 'italic', color: 'text.secondary' }}>
+                    High affect range indicates emotional flexibility and communication richness.
+                  </Typography>
+                </Box>
+              }
             >
-              <CardContent>
-                <Typography variant="h4" color="primary">
-                  {auData.affect_range?.toFixed(1) || 'N/A'}
-                </Typography>
-                <Typography variant="body2">Affect Range</Typography>
-                <Typography variant="caption">Wide variety</Typography>
-                <Typography variant="caption" sx={{ display: 'block', mt: 1, fontStyle: 'italic' }}>
-                  Click to see formula
-                </Typography>
-              </CardContent>
-            </Card>
+              <Card
+                sx={{ 
+                  cursor: 'pointer',
+                  '&:hover': { 
+                    boxShadow: 6, 
+                    transform: 'scale(1.02)',
+                  },
+                  transition: 'all 0.2s'
+                }}
+                onClick={() => handleMetricClick('affect_range')}
+              >
+                <CardContent>
+                  <Typography variant="h4" color="primary">
+                    {auData.affect_range?.toFixed(1) || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2">Affect Range</Typography>
+                  <Typography variant="caption">Wide variety</Typography>
+                  <Typography variant="caption" sx={{ display: 'block', mt: 1, fontStyle: 'italic' }}>
+                    Click to see formula
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Tooltip>
           </Grid>
           <Grid item xs={12} md={3}>
-            <Card
-              sx={{ 
-                cursor: 'pointer',
-                '&:hover': { 
-                  boxShadow: 6, 
-                  transform: 'scale(1.02)',
-                },
-                transition: 'all 0.2s'
-              }}
-              onClick={() => handleMetricClick('mobility')}
+            <Tooltip
+              arrow
+              placement="top"
+              title={
+                <Box sx={{ maxWidth: 350, p: 1 }}>
+                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom color="secondary">
+                    💪 Facial Mobility
+                  </Typography>
+                  <Divider sx={{ my: 1 }} />
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>What it measures:</strong> Intensity and strength of facial muscle movements.
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>How it's calculated:</strong> Average intensity of all Action Unit activations × 100
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Clinical significance:</strong>
+                  </Typography>
+                  <Box sx={{ fontSize: '0.8rem', ml: 1 }}>
+                    • <strong>70-100:</strong> High mobility - pronounced, visible expressions<br/>
+                    • <strong>40-70:</strong> Moderate - typical facial movement<br/>
+                    • <strong>0-40:</strong> Low - subtle or restricted movements
+                  </Box>
+                  <Typography variant="caption" sx={{ display: 'block', mt: 1, fontStyle: 'italic', color: 'text.secondary' }}>
+                    Low mobility may indicate muscle weakness, neuromuscular conditions, or intentional suppression.
+                  </Typography>
+                </Box>
+              }
             >
-              <CardContent>
-                <Typography variant="h4" color="secondary">
-                  {auData.mobility?.toFixed(1) || 'N/A'}
-                </Typography>
-                <Typography variant="body2">Mobility</Typography>
-                <Typography variant="caption">Moderate movement</Typography>
-                <Typography variant="caption" sx={{ display: 'block', mt: 1, fontStyle: 'italic' }}>
-                  Click to see formula
-                </Typography>
-              </CardContent>
-            </Card>
+              <Card
+                sx={{ 
+                  cursor: 'pointer',
+                  '&:hover': { 
+                    boxShadow: 6, 
+                    transform: 'scale(1.02)',
+                  },
+                  transition: 'all 0.2s'
+                }}
+                onClick={() => handleMetricClick('mobility')}
+              >
+                <CardContent>
+                  <Typography variant="h4" color="secondary">
+                    {auData.mobility?.toFixed(1) || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2">Mobility</Typography>
+                  <Typography variant="caption">Moderate movement</Typography>
+                  <Typography variant="caption" sx={{ display: 'block', mt: 1, fontStyle: 'italic' }}>
+                    Click to see formula
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Tooltip>
           </Grid>
           <Grid item xs={12} md={3}>
-            <Card
-              sx={{ 
-                cursor: 'pointer',
-                '&:hover': { 
-                  boxShadow: 6, 
-                  transform: 'scale(1.02)',
-                },
-                transition: 'all 0.2s'
-              }}
-              onClick={() => handleMetricClick('symmetry')}
+            <Tooltip
+              arrow
+              placement="top"
+              title={
+                <Box sx={{ maxWidth: 350, p: 1 }}>
+                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom sx={{ color: 'warning.main' }}>
+                    😐 Flat Affect
+                  </Typography>
+                  <Divider sx={{ my: 1 }} />
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>What it measures:</strong> Degree of reduced facial expressiveness or emotional blunting.
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>How it's calculated:</strong> Combines low diversity (40%), low intensity (35%), and inactive frames (25%).
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Clinical significance:</strong>
+                  </Typography>
+                  <Box sx={{ fontSize: '0.8rem', ml: 1 }}>
+                    • <strong>0-30:</strong> Normal - healthy emotional expression<br/>
+                    • <strong>30-60:</strong> Moderate - some flatness present<br/>
+                    • <strong>60-100:</strong> High - significant flat affect
+                  </Box>
+                  <Typography variant="caption" sx={{ display: 'block', mt: 1, fontStyle: 'italic', color: 'text.secondary' }}>
+                    ⚠️ Higher scores may indicate depression, schizophrenia, autism, Parkinson's, or cultural factors.
+                  </Typography>
+                </Box>
+              }
             >
-              <CardContent>
-                <Typography variant="h4" color="info.main">
-                  {auData.symmetry?.toFixed(1) || 'N/A'}
-                </Typography>
-                <Typography variant="body2">Symmetry</Typography>
-                <Typography variant="caption">Asymmetric</Typography>
-                <Typography variant="caption" sx={{ display: 'block', mt: 1, fontStyle: 'italic' }}>
-                  Click to see formula
-                </Typography>
-              </CardContent>
-            </Card>
+              <Card
+                sx={{ 
+                  cursor: 'pointer',
+                  '&:hover': { 
+                    boxShadow: 6, 
+                    transform: 'scale(1.02)',
+                  },
+                  transition: 'all 0.2s'
+                }}
+                onClick={() => handleMetricClick('flat_affect')}
+              >
+                <CardContent>
+                  <Typography variant="h4" color="warning.main">
+                    {auData.flat_affect?.toFixed(1) || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2">Flat Affect</Typography>
+                  <Typography variant="caption">
+                    {auData?.flat_affect >= 70 ? 'High' : auData?.flat_affect >= 40 ? 'Moderate' : 'Low'}
+                  </Typography>
+                  <Typography variant="caption" sx={{ display: 'block', mt: 1, fontStyle: 'italic' }}>
+                    Click to see formula
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Tooltip>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <Tooltip
+              arrow
+              placement="top"
+              title={
+                <Box sx={{ maxWidth: 350, p: 1 }}>
+                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom sx={{ color: 'success.main' }}>
+                    😊 Flat Affect Inverted (Expressiveness)
+                  </Typography>
+                  <Divider sx={{ my: 1 }} />
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>What it measures:</strong> Overall facial expressiveness - the opposite of flat affect.
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>How it's calculated:</strong> 100 - Flat Affect Score
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Clinical significance:</strong>
+                  </Typography>
+                  <Box sx={{ fontSize: '0.8rem', ml: 1 }}>
+                    • <strong>70-100:</strong> Highly expressive - rich emotional display<br/>
+                    • <strong>40-70:</strong> Moderate - typical expressiveness<br/>
+                    • <strong>0-40:</strong> Limited - reduced emotional expression
+                  </Box>
+                  <Typography variant="caption" sx={{ display: 'block', mt: 1, fontStyle: 'italic', color: 'text.secondary' }}>
+                    ✅ Higher is better. Used in composite scoring where "more is better" is intuitive.
+                  </Typography>
+                </Box>
+              }
+            >
+              <Card
+                sx={{ 
+                  cursor: 'pointer',
+                  '&:hover': { 
+                    boxShadow: 6, 
+                    transform: 'scale(1.02)',
+                  },
+                  transition: 'all 0.2s'
+                }}
+                onClick={() => handleMetricClick('flat_affect_inverted')}
+              >
+                <CardContent>
+                  <Typography variant="h4" color="success.main">
+                    {(100 - (auData.flat_affect || 0)).toFixed(1) || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2">Flat Affect Inverted</Typography>
+                  <Typography variant="caption">
+                    {(100 - (auData?.flat_affect || 0)) >= 60 ? 'Expressive' : (100 - (auData?.flat_affect || 0)) >= 40 ? 'Moderate' : 'Limited'}
+                  </Typography>
+                  <Typography variant="caption" sx={{ display: 'block', mt: 1, fontStyle: 'italic' }}>
+                    Click to see formula
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Tooltip>
           </Grid>
         </Grid>
       </Paper>

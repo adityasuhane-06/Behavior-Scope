@@ -312,9 +312,13 @@ def _detect_repetitions(
         if pitch_cv > threshold:
             start_time = feature.start_time
             end_time = feature.end_time
-            duration = end_time - start_time
+            raw_duration = end_time - start_time
             
-            # Severity based on duration and intensity
+            # Cap duration at realistic values for stuttering events
+            # Sound repetitions typically last 0.2-1.5 seconds, not full segments
+            duration = min(raw_duration, 1.5)  # Cap at 1.5 seconds max
+            
+            # Severity based on pitch variability, not duration
             if pitch_cv > 0.3:
                 severity = 'severe'
             elif pitch_cv > 0.2:
@@ -324,7 +328,7 @@ def _detect_repetitions(
             
             event = DisfluencyEvent(
                 start_time=start_time,
-                end_time=end_time,
+                end_time=start_time + duration,  # Use capped duration
                 duration=duration,
                 disfluency_type='sound_repetition',
                 severity=severity,
@@ -353,12 +357,14 @@ def _detect_prolongations(
         pitch_std = feature.pitch_std
         energy_mean = feature.energy_mean
         
-        duration = feature.end_time - feature.start_time
+        raw_duration = feature.end_time - feature.start_time
         
         # Prolongation: low pitch variance, high energy, long duration
-        if pitch_std < 10.0 and energy_mean > -30.0 and duration > min_duration:
+        if pitch_std < 10.0 and energy_mean > -30.0 and raw_duration > min_duration:
             start_time = feature.start_time
-            end_time = feature.end_time
+            
+            # Cap duration at realistic values (prolongations rarely exceed 3s)
+            duration = min(raw_duration, 3.0)
             
             # Severity based on duration
             if duration > 2.0:
@@ -370,7 +376,7 @@ def _detect_prolongations(
             
             event = DisfluencyEvent(
                 start_time=start_time,
-                end_time=end_time,
+                end_time=start_time + duration,
                 duration=duration,
                 disfluency_type='prolongation',
                 severity=severity,
@@ -627,13 +633,27 @@ def _detect_transcript_disfluencies(
         # Handle both speaker_id (standard) and speaker (legacy)
         speaker = getattr(segment, 'speaker_id', getattr(segment, 'speaker', None))
         
+        # More flexible target matching
         is_target = False
-        if speaker == target_role or speaker == target_speaker:
+        
+        # Explicit exclusions first
+        if speaker and any(role in speaker.lower() for role in ['therapist', 'doctor', 'clinician', 'adult']):
+            is_target = False
+        
+        elif speaker == target_role or speaker == target_speaker:
             is_target = True
         elif speaker and 'patient' in speaker.lower():
             is_target = True
         elif speaker and 'child' in speaker.lower():
             is_target = True
+        # Also check for [Response] tag - responses are from the patient/child
+        elif '[Response]' in segment.text or '[response]' in segment.text.lower():
+            is_target = True
+        # If no speaker info and it's not a question, assume it might be target
+        elif speaker is None or speaker == '':
+            # Check if it's NOT a therapist segment (no [Question] tag)
+            if '[Question]' not in segment.text and '[question]' not in segment.text.lower():
+                is_target = True
             
         if not is_target:
             continue
@@ -668,9 +688,10 @@ def _detect_transcript_disfluencies(
                 )
                 events.append(event)
         
-        # 2. Check for sound/syllable repetitions (e.g., "p-p-park", "k-k-kids")
+        # 2. Check for sound/syllable repetitions (e.g., "p-p-park", "k-k-k-kids")
         import re
-        sound_repetition_pattern = r'\b([a-z])-\1+-[a-z]+\b'  # Matches p-p-park, k-k-k-kids, etc.
+        # Fixed regex: ([a-z]) captures first letter, (-\1)+ matches one or more "-letter" repetitions
+        sound_repetition_pattern = r'\b([a-z])(-\1)+-[a-z]+\b'  # Matches p-p-park, k-k-k-kids, etc.
         matches = re.finditer(sound_repetition_pattern, text)
         for match in matches:
             word = match.group(0)

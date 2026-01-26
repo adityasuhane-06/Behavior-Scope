@@ -300,6 +300,55 @@ function EyeContactAudit() {
           </Grid>
         </Grid>
 
+        {/* Improved Metrics Row */}
+        <Grid container spacing={3} sx={{ mt: 2 }}>
+          <Grid item xs={12} md={4}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Eye Contact Frequency
+                </Typography>
+                <Typography variant="h4">
+                  {auditData.frequency_per_min?.toFixed(1) || '0.0'}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  episodes per minute
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Average Duration
+                </Typography>
+                <Typography variant="h4">
+                  {auditData.mean_duration?.toFixed(1) || '0.0'}s
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  per episode
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Longest Episode
+                </Typography>
+                <Typography variant="h4">
+                  {auditData.longest_episode?.toFixed(1) || '0.0'}s
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  max sustained contact
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
         {/* Quality Assessment */}
         <Box sx={{ mt: 3 }}>
           <Typography variant="h6" gutterBottom>
@@ -338,8 +387,8 @@ function EyeContactAudit() {
         <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }} variant="scrollable" scrollButtons="auto">
           <Tab icon={<AssessmentIcon />} label="Gaze Direction Breakdown" />
           <Tab icon={<TimelineIcon />} label="Analysis Details" />
-          <Tab icon={<AccessTimeIcon />} label="Time-stamped Evidence" />
-          <Tab label="Methodology & Formulas" />
+          {/* <Tab icon={<AccessTimeIcon />} label="Time-stamped Evidence" />
+          <Tab label="Methodology & Formulas" /> */}
         </Tabs>
 
 
@@ -775,12 +824,12 @@ function EyeContactAudit() {
                               sx={{
                                 width: 12,
                                 height: 12,
-                                bgcolor: '#4CAF50',
+                                bgcolor: '#9E9E9E',
                                 borderRadius: '50%',
                                 mr: 1
                               }}
                             />
-                            Direct Eye Contact
+                             No Episodes Detected
                           </Box>
                         </TableCell>
                         <TableCell sx={{ fontFamily: 'monospace' }}>0.000s</TableCell>
@@ -789,7 +838,7 @@ function EyeContactAudit() {
                           <Chip 
                             label={`${auditData.session_duration?.toFixed(2) || '0.00'}s`} 
                             size="small" 
-                            color="primary"
+                            color="default"
                             variant="outlined"
                           />
                         </TableCell>
@@ -810,425 +859,9 @@ function EyeContactAudit() {
                 </Table>
               </TableContainer>
             </Box>
-
-            {/* Confidence Timeline Chart */}
-            <Box sx={{ mb: 4 }}>
-              <Typography variant="h5" gutterBottom sx={{ color: 'primary.main', fontWeight: 'bold' }}>
-                📉 Confidence Timeline
-              </Typography>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={confidenceTimelineData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="timestamp"
-                    label={{ value: 'Time (s)', position: 'insideBottom', offset: -5 }}
-                  />
-                  <YAxis
-                    label={{ value: 'Score (%)', angle: -90, position: 'insideLeft' }}
-                    domain={[0, 100]}
-                  />
-                  <Tooltip
-                    formatter={(value, name) => [
-                      `${value.toFixed(1)}%`,
-                      name === 'confidence' ? 'Confidence' : 'Eye Contact'
-                    ]}
-                    labelFormatter={(value) => `Time: ${value}s`}
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="confidence"
-                    stroke="#1976d2"
-                    name="Detection Confidence"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="eyeContact"
-                    stroke="#4CAF50"
-                    name="Eye Contact Detected"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </Box>
-          </Box>
-        )}
-
-        {/* Tab 2: Time-stamped Evidence */}
-        {activeTab === 2 && (
-          <Box>
-            <Typography variant="h5" gutterBottom sx={{ color: 'primary.main', fontWeight: 'bold' }}>
-              <AccessTimeIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-              Time-stamped Evidence ({auditData.total_frames || 0} frames)
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Frame-by-frame detection data showing when eye contact was detected/not detected with precise timestamps.
-              Click on any timestamp to see detailed analysis.
-            </Typography>
-
-            {/* Summary Cards */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={6} md={3}>
-                <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light' }}>
-                  <Typography variant="h5" color="success.contrastText">
-                    {Math.round((auditData.eye_contact_percentage || 100) * (auditData.total_frames || 0) / 100)}
-                  </Typography>
-                  <Typography variant="body2" color="success.contrastText">
-                    Eye Contact Frames
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={6} md={3}>
-                <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'error.light' }}>
-                  <Typography variant="h5" color="error.contrastText">
-                    {(auditData.total_frames || 0) - Math.round((auditData.eye_contact_percentage || 100) * (auditData.total_frames || 0) / 100)}
-                  </Typography>
-                  <Typography variant="body2" color="error.contrastText">
-                    Non-Contact Frames
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={6} md={3}>
-                <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'info.light' }}>
-                  <Typography variant="h5" color="info.contrastText">
-                    0.000s
-                  </Typography>
-                  <Typography variant="body2" color="info.contrastText">
-                    First Detection
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={6} md={3}>
-                <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.light' }}>
-                  <Typography variant="h5" color="warning.contrastText">
-                    {auditData.session_duration?.toFixed(3) || '0.000'}s
-                  </Typography>
-                  <Typography variant="body2" color="warning.contrastText">
-                    Last Detection
-                  </Typography>
-                </Paper>
-              </Grid>
-            </Grid>
-
-            {/* Frame-by-Frame Evidence Table */}
-            <TableContainer component={Paper} sx={{ maxHeight: 500 }}>
-              <Table stickyHeader>
-                <TableHead>
-                  <TableRow sx={{ bgcolor: 'grey.900' }}>
-                    <TableCell sx={{ bgcolor: 'grey.900', color: 'white', fontWeight: 'bold' }}>
-                      <AccessTimeIcon sx={{ fontSize: 16, mr: 0.5, verticalAlign: 'middle' }} />
-                      Time
-                    </TableCell>
-                    <TableCell sx={{ bgcolor: 'grey.900', color: 'white', fontWeight: 'bold' }}>Frame</TableCell>
-                    <TableCell sx={{ bgcolor: 'grey.900', color: 'white', fontWeight: 'bold' }}>Eye Contact</TableCell>
-                    <TableCell sx={{ bgcolor: 'grey.900', color: 'white', fontWeight: 'bold' }}>Gaze Direction</TableCell>
-                    <TableCell sx={{ bgcolor: 'grey.900', color: 'white', fontWeight: 'bold' }}>
-                      <MuiTooltip 
-                        title="Face Quality (40%) + Landmark Stability (30%) + Gaze Consistency (30%)"
-                        arrow
-                      >
-                        <span style={{ cursor: 'help' }}>
-                          Confidence <HelpOutlineIcon sx={{ fontSize: 14, ml: 0.5, verticalAlign: 'middle' }} />
-                        </span>
-                      </MuiTooltip>
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {/* Generate frame evidence - if frame_evidence exists, use it; otherwise generate from total_frames */}
-                  {(auditData.frame_evidence && auditData.frame_evidence.length > 0) ? (
-                    auditData.frame_evidence.slice(0, 100).map((frame, idx) => (
-                      <TableRow key={idx} hover sx={{ '&:nth-of-type(odd)': { bgcolor: 'grey.50' } }}>
-                        <TableCell sx={{ fontFamily: 'monospace' }}>
-                          <Chip
-                            icon={<AccessTimeIcon />}
-                            label={`${frame.timestamp?.toFixed(3) || (idx / 24).toFixed(3)}s`}
-                            size="small"
-                            variant="outlined"
-                          />
-                        </TableCell>
-                        <TableCell>{frame.frame_number || idx}</TableCell>
-                        <TableCell>
-                          <Chip
-                            label={frame.eye_contact_detected ? 'Yes' : 'No'}
-                            size="small"
-                            color={frame.eye_contact_detected ? 'success' : 'error'}
-                            sx={{ minWidth: 60 }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={GAZE_DIRECTION_NAMES[frame.gaze_direction] || 'Direct Eye Contact'}
-                            size="small"
-                            sx={{
-                              bgcolor: GAZE_DIRECTION_COLORS[frame.gaze_direction] || '#4CAF50',
-                              color: 'white'
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <LinearProgress
-                              variant="determinate"
-                              value={(frame.confidence_score || auditData.average_confidence || 0.9) * 100}
-                              sx={{ width: 80, mr: 1 }}
-                              color={(frame.confidence_score || auditData.average_confidence || 0.9) >= 0.7 ? 'success' : 'warning'}
-                            />
-                            <Typography variant="body2">
-                              {((frame.confidence_score || auditData.average_confidence || 0.9) * 100).toFixed(0)}%
-                            </Typography>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    /* Generate synthetic frame evidence based on total frames */
-                    Array.from({ length: Math.min(auditData.total_frames || 100, 100) }, (_, idx) => (
-                      <TableRow key={idx} hover sx={{ '&:nth-of-type(odd)': { bgcolor: 'grey.50' } }}>
-                        <TableCell sx={{ fontFamily: 'monospace' }}>
-                          <Chip
-                            icon={<AccessTimeIcon />}
-                            label={`${(idx / 24).toFixed(3)}s`}
-                            size="small"
-                            variant="outlined"
-                          />
-                        </TableCell>
-                        <TableCell>{idx}</TableCell>
-                        <TableCell>
-                          <Chip
-                            label="Yes"
-                            size="small"
-                            color="success"
-                            sx={{ minWidth: 60 }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label="Direct Eye Contact"
-                            size="small"
-                            sx={{ bgcolor: '#4CAF50', color: 'white' }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <LinearProgress
-                              variant="determinate"
-                              value={(auditData.average_confidence || 0.9) * 100}
-                              sx={{ width: 80, mr: 1 }}
-                              color="success"
-                            />
-                            <Typography variant="body2">
-                              {((auditData.average_confidence || 0.9) * 100).toFixed(0)}%
-                            </Typography>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            
-            {(auditData.total_frames || 0) > 100 && (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                Showing first 100 frames of {auditData.total_frames} total frames for performance. 
-                All frames are included in the analysis calculations.
-              </Alert>
-            )}
-          </Box>
-        )}
-
-        {/* Tab 3: Methodology & Formulas */}
-        {activeTab === 3 && (
-          <Box>
-
-
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <Typography variant="h6" gutterBottom>
-                  Analysis Methodology
-                </Typography>
-                <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                  {Object.entries(auditData.methodology || {}).map(([key, value]) => (
-                    <Box key={key} sx={{ mb: 2 }}>
-                      <Typography variant="subtitle2" color="primary">
-                        {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {value}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Paper>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography variant="h6" gutterBottom>
-                  Detection Thresholds
-                </Typography>
-                <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                  {Object.entries(auditData.thresholds_used || {}).map(([key, value]) => (
-                    <Box key={key} sx={{ mb: 1, display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2">
-                        {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:
-                      </Typography>
-                      <Typography variant="body2" color="primary">
-                        {typeof value === 'number' ? value.toFixed(3) : value}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Paper>
-              </Grid>
-            </Grid>
-
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Model Versions
-              </Typography>
-              <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                <Grid container spacing={2}>
-                  {Object.entries(auditData.model_versions || {}).map(([key, value]) => (
-                    <Grid item xs={12} md={4} key={key}>
-                      <Typography variant="subtitle2" color="primary">
-                        {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </Typography>
-                      <Typography variant="body2">{value}</Typography>
-                    </Grid>
-                  ))}
-                </Grid>
-              </Paper>
-            </Box>
           </Box>
         )}
       </Paper>
-
-      {/* Frame Details Dialog */}
-      <Dialog
-        open={frameDetailsOpen}
-        onClose={closeFrameDetails}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          Frame {selectedFrame?.frame_number} Analysis Details
-        </DialogTitle>
-        <DialogContent>
-          {selectedFrame && (
-            <Box>
-              <Grid container spacing={2} sx={{ mb: 2 }}>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Timestamp
-                  </Typography>
-                  <Typography variant="h6">{selectedFrame.timestamp.toFixed(3)}s</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Detection Method
-                  </Typography>
-                  <Typography variant="h6">{selectedFrame.detection_method}</Typography>
-                </Grid>
-              </Grid>
-
-              <Divider sx={{ my: 2 }} />
-
-              <Typography variant="h6" gutterBottom>
-                Gaze Analysis
-              </Typography>
-              <Grid container spacing={2} sx={{ mb: 2 }}>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Gaze Direction
-                  </Typography>
-                  <Chip
-                    label={GAZE_DIRECTION_NAMES[selectedFrame.gaze_direction] || selectedFrame.gaze_direction}
-                    sx={{
-                      bgcolor: GAZE_DIRECTION_COLORS[selectedFrame.gaze_direction] || '#9E9E9E',
-                      color: 'white'
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Eye Contact Detected
-                  </Typography>
-                  <Chip
-                    label={selectedFrame.eye_contact_detected ? 'Yes' : 'No'}
-                    color={selectedFrame.eye_contact_detected ? 'success' : 'default'}
-                  />
-                </Grid>
-              </Grid>
-
-              {selectedFrame.gaze_vector && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    3D Gaze Vector (x, y, z)
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontFamily: 'monospace' }}>
-                    ({selectedFrame.gaze_vector[0].toFixed(3)}, {selectedFrame.gaze_vector[1].toFixed(3)}, {selectedFrame.gaze_vector[2].toFixed(3)})
-                  </Typography>
-                </Box>
-              )}
-
-              <Divider sx={{ my: 2 }} />
-
-              <Typography variant="h6" gutterBottom>
-                Quality Metrics
-              </Typography>
-              <Grid container spacing={2} sx={{ mb: 2 }}>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Detection Confidence
-                  </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <LinearProgress
-                      variant="determinate"
-                      value={selectedFrame.confidence_score * 100}
-                      sx={{ width: 100, mr: 1 }}
-                    />
-                    <Typography variant="body2">
-                      {(selectedFrame.confidence_score * 100).toFixed(1)}%
-                    </Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Face Landmarks Quality
-                  </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <LinearProgress
-                      variant="determinate"
-                      value={selectedFrame.face_landmarks_quality * 100}
-                      sx={{ width: 100, mr: 1 }}
-                    />
-                    <Typography variant="body2">
-                      {(selectedFrame.face_landmarks_quality * 100).toFixed(1)}%
-                    </Typography>
-                  </Box>
-                </Grid>
-              </Grid>
-
-              {selectedFrame.quality_flags && selectedFrame.quality_flags.length > 0 && (
-                <Box>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    Quality Flags
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    {selectedFrame.quality_flags.map((flag, idx) => (
-                      <Chip key={idx} label={flag} size="small" variant="outlined" />
-                    ))}
-                  </Box>
-                </Box>
-              )}
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeFrameDetails}>Close</Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }

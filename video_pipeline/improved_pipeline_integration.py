@@ -321,8 +321,18 @@ class ImprovedVideoProcessor:
                 frame_idx,
                 timestamp,
                 frame.shape[1],
-                frame.shape[0]
+                frame.shape[0],
+                frame=frame
             )
+            
+            # Inject L2CS Gaze into Gaze Proxy for Stability Scoring
+            # Gaze Proxy usually requires a scalar that varies with gaze direction.
+            # Using X-coordinate (horizontal gaze) is a good proxy for scanning/instability.
+            if gaze_estimate and gaze_estimate.combined_gaze_vector:
+                # Use X coordinate as proxy (0 center, -1 left, 1 right)
+                # This ensures downstream aggregation (std dev) captures gaze variance.
+                # L2CS is stable, so this gives accurate Stability Score.
+                face_features.gaze_proxy = gaze_estimate.combined_gaze_vector[0]
         
         # Data quality assessment (per frame)
         data_quality = self._assess_frame_quality(face_features, pose_features)

@@ -30,7 +30,16 @@ from typing import List, Optional, Tuple, Dict
 import warnings
 
 import numpy as np
+import numpy as np
 import cv2
+from pathlib import Path
+
+# Import Deep Learning Gaze Estimator
+try:
+    from enhanced_attention_tracking.detection.l2cs_gaze import L2CSGazeEstimator
+    DL_GAZE_AVAILABLE = True
+except ImportError:
+    DL_GAZE_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +121,31 @@ class ImprovedGazeEstimator:
         self.prev_gaze_vector = None
         self.gaze_history = []
         
+        # Initialize L2CS Deep Learning Model
+        self.l2cs_model = None
+        if DL_GAZE_AVAILABLE:
+            try:
+                # Find model path relative to project root
+                # Assuming running from root, or standard path structure
+                # Try multiple common locations
+                paths = [
+                    Path("data/models/L2CSNet_gaze360.pkl"),
+                    Path("../data/models/L2CSNet_gaze360.pkl"),
+                    Path("c:/Users/Lenovo/Desktop/Behavior Scope/data/models/L2CSNet_gaze360.pkl")
+                ]
+                model_path = None
+                for p in paths:
+                    if p.exists():
+                        model_path = str(p)
+                        break
+                
+                if model_path:
+                    self.l2cs_model = L2CSGazeEstimator(model_path)
+                    if self.l2cs_model.active:
+                        logger.info(f"L2CS Deep Learning Gaze Model loaded from {model_path}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize L2CS model: {e}")
+
         logger.info("Improved gaze estimator initialized")
     
     def estimate_gaze(
@@ -121,7 +155,8 @@ class ImprovedGazeEstimator:
         frame_idx: int,
         timestamp: float,
         img_width: int,
-        img_height: int
+        img_height: int,
+        frame: Optional[np.ndarray] = None
     ) -> GazeEstimate:
         """
         Estimate gaze direction from facial landmarks.
@@ -140,6 +175,94 @@ class ImprovedGazeEstimator:
         # Set up camera matrix if not provided
         if self.camera_matrix is None:
             self.camera_matrix = self._estimate_camera_matrix(img_width, img_height)
+
+        # --- PRIORITY: Deep Learning L2CS ---
+        if self.l2cs_model and self.l2cs_model.active and frame is not None:
+             try:
+                 # Estimate with L2CS
+                 # We need BBox. Construct from landmarks.
+                 if len(landmarks) > 0:
+                     xs = landmarks[:, 0]
+                     ys = landmarks[:, 1]
+                     # Check if normalized or pixel
+                     if np.max(xs) <= 1.0:
+                         xs = xs * img_width
+                         ys = ys * img_height
+                     
+                     x1, x2 = np.min(xs), np.max(xs)
+                     y1, y2 = np.min(ys), np.max(ys)
+                     bbox = [int(x1), int(y1), int(x2), int(y2)]
+                     
+                     # Convert to RGB
+                     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                     yaw, pitch = self.l2cs_model.estimate_gaze(rgb_frame, bbox)
+                     
+                     if yaw is not None:
+                         # Success!
+                         # Convert to vector: Gaze Z is forward (positive? or negative?).
+                         # L2CS: Pitch (- down, + up), Yaw (- right, + left).
+                         # Standard Vector: X (right), Y (up), Z (forward/back).
+                         
+                         # Map to standard coordinates for this pipeline
+                         # This pipeline uses: _gaze_vector_to_angles: 
+                         # yaw = degrees(atan2(x, -z)). 
+                         # pitch = degrees(atan2(y, sqrt(x^2+z^2))).
+                         # So Z is negative forward? (Video pipeline usually Z is negative into screen).
+                         
+                         # Construct vector from angles
+                         # x = -sin(yaw)  (since L2CS yaw + is left, but X+ is right)
+                         # y = sin(pitch) (L2CS pitch + is up, Y+ is up?)
+                         # z = -cos(yaw)*cos(pitch)
+                         
+                         # Let's verify L2CS output vs Standard.
+                         # L2CS Yaw: Left is Positive. Right is Negative.
+                         # Pipeline Yaw: atan2(x, -z). If x>0 (Right), -z>0. atan2(+, +) = Positive?
+                         # Usually standard camera: X Right, Y Down, Z Forward (Pos).
+                         
+                         # Let's align with the existing `_estimate_gaze_vector` logic output.
+                         # `_estimate_gaze_vector` returns (x, y, z).
+                         # `_gaze_vector_to_angles` consumes it.
+                         
+                         g_x = -np.sin(yaw)
+                         g_y = -np.sin(pitch)
+                         g_z = -np.cos(yaw) * np.cos(pitch) # Z is negative into scene
+                         
+                         combined_gaze = (g_x, g_y, g_z)
+                         gaze_angles = (np.degrees(yaw), np.degrees(pitch))
+                         
+                         # Get pupil positions (still use landmarks for this visualization)
+                         _, l_pupil = self._detect_pupil(landmarks, 'left')
+                         _, r_pupil = self._detect_pupil(landmarks, 'right')
+                         
+                         # Compute Stability
+                         stability = self._compute_gaze_stability(combined_gaze)
+                         
+                         # Zone
+                         zone = self._classify_attention_zone(combined_gaze, head_pose)
+                         
+                         # Update History
+                         self.prev_gaze_vector = combined_gaze
+                         self.gaze_history.append(combined_gaze)
+                         if len(self.gaze_history) > 30: self.gaze_history.pop(0)
+
+                         return GazeEstimate(
+                             frame_idx=frame_idx,
+                             timestamp=timestamp,
+                             eyes_detected=True,
+                             left_gaze_vector=combined_gaze,
+                             right_gaze_vector=combined_gaze,
+                             combined_gaze_vector=combined_gaze,
+                             gaze_angles=gaze_angles,
+                             attention_zone=zone,
+                             gaze_stability=stability,
+                             confidence=0.95, # High confidence for DL
+                             pupil_positions={'left': l_pupil, 'right': r_pupil}
+                         )
+             except Exception as e:
+                 # Fallback to legacy
+                 pass
+        
+        # --- Fallback to Legacy Geometric Method ---
         
         # Extract eye regions
         left_eye_detected, left_pupil = self._detect_pupil(landmarks, 'left')
@@ -359,8 +482,8 @@ class ImprovedGazeEstimator:
         total_pitch = pitch + head_pitch
         
         # Define attention zones (these could be configurable)
-        if abs(total_yaw) < 15 and abs(total_pitch) < 10:
-            return 'screen'  # Looking at camera/screen
+        if abs(total_yaw) < 30 and abs(total_pitch) < 20:
+            return 'screen'  # Looking at camera/screen (Relaxed for Eye Contact)
         elif total_yaw < -20 and abs(total_pitch) < 20:
             return 'therapist'  # Looking to the left (typical therapist position)
         elif abs(total_yaw) > 45 or abs(total_pitch) > 30:
