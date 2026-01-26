@@ -1,6 +1,20 @@
 # Rule-based thresholds for behavioral dysregulation detection
 # All values are empirically tunable based on validation data
 
+# ===== PARTICIPANT INFO =====
+# Participant demographics for age-appropriate baseline comparison
+participant:
+  # Age in years (optional, can also be set via --age command line argument)
+  # Used to select age-appropriate population norms for baseline comparison
+  # Age groups:
+  #   - Young child (3-5 years): speech_rate ~3.0 syll/s, longer pauses, higher pitch variability
+  #   - School age (6-8 years): speech_rate ~3.5 syll/s, moderate pauses
+  #   - Pre-teen (9-12 years): speech_rate ~4.0 syll/s, approaching adult patterns
+  #   - Teen (13-17 years): speech_rate ~4.3 syll/s, near-adult characteristics
+  #   - Adult (18+): speech_rate ~4.5 syll/s, mature speech patterns
+  # If not specified, adult norms are used
+  age: null  # Set to participant age or use --age flag
+
 # ===== AUDIO PIPELINE =====
 audio:
   # Voice Activity Detection
@@ -72,6 +86,21 @@ video:
   # Processing parameters
   target_fps: 5  # Downsample to 5 FPS for efficiency
   
+  # Improved processing (Phase 1 enhancements)
+  improved_processing:
+    enabled: false  # TEMPORARILY DISABLED due to file corruption - enable after fixing improved_gaze_estimation.py
+    enable_kalman_smoothing: true  # Reduce frame-to-frame noise
+    enable_adaptive_windowing: true  # Behavioral episode-based windows
+    enable_improved_gaze: true  # 3D gaze estimation
+    enable_multiscale_analysis: true  # Multi-scale temporal analysis
+    
+  # Missing data handling
+  missing_data:
+    short_gap_threshold_sec: 1.0  # Linear interpolation threshold
+    long_gap_threshold_sec: 3.0   # Exclusion threshold
+    interpolation_method: 'linear'  # Interpolation method
+    min_quality_threshold: 0.5    # Minimum quality for analysis
+  
   # MediaPipe Face Mesh
   face:
     # Head pose angles (degrees)
@@ -99,14 +128,27 @@ video:
     normal_hand_velocity_max: 15.0
     high_hand_velocity_threshold: 40.0
     
-  # Temporal Aggregation
+  # Temporal Aggregation (Enhanced)
   temporal:
+    # Legacy parameters (for backward compatibility)
     window_duration_sec: 5.0  # Match audio window
     aggregation_functions:
       - mean
       - std
       - max
       - percentile_95
+    
+    # New improved temporal aggregation parameters
+    min_window_duration_sec: 2.0   # Minimum adaptive window size
+    max_window_duration_sec: 15.0  # Maximum adaptive window size
+    
+    # Kalman filtering parameters
+    kalman_process_noise: 0.1      # How much features can change between frames
+    kalman_measurement_noise: 0.5  # Sensor uncertainty
+    
+    # Missing data handling
+    max_interpolation_gap_sec: 1.0  # Maximum gap to interpolate
+    min_data_completeness: 0.7      # Minimum data completeness for reliable metrics
 
 # ===== FUSION =====
 fusion:
@@ -166,11 +208,34 @@ autism_analysis:
     typical_latency_sec: 1.0         # Typical response time
     elevated_latency_sec: 3.0        # Elevated delay threshold
     
-  # Eye contact detection
+  # Eye contact detection (Enhanced with Gemini AI)
   eye_contact:
     head_facing_threshold_deg: 30.0     # Head within ±30° = facing forward
-    gaze_forward_threshold: 0.05        # Gaze variance < 0.05 = looking forward
-    min_episode_duration_sec: 0.5       # Minimum episode length
+    gaze_forward_threshold: 0.08        # Gaze variance < 0.08 = looking forward (RELAXED)
+    min_episode_duration_sec: 0.3       # Minimum episode length (REDUCED)
+    
+  # Gemini AI Enhanced Eye Contact (OPTIONAL - API dependency)
+  gemini_eye_contact:
+    enabled: false  # DISABLED by default to reduce API dependency
+    sample_rate: 5  # Analyze every 5th frame (to manage API costs)
+    confidence_threshold: 0.7  # Minimum confidence for eye contact detection
+    # Uses Gemini 2.5 Flash for contextual understanding of:
+    #   - Direct vs. peripheral eye contact
+    #   - Social engagement vs. avoidance
+    #   - Gaze direction and quality
+    #   - Clinical behavioral patterns
+  
+  # Local Pretrained Model Eye Contact (NEW! - No API dependency)
+  local_eye_contact:
+    enabled: true   # ENABLED by default - uses local models only
+    frame_selection: "transcript_guided"  # "transcript_guided" or "uniform"
+    sample_interval_sec: 0.5  # Sample every 0.5s during key moments
+    confidence_threshold: 0.6  # Minimum confidence for detection
+    # Uses local pretrained models:
+    #   - MediaPipe Face Mesh for landmarks
+    #   - OpenCV for gaze estimation  
+    #   - Local CNN for eye contact classification
+    #   - Clinical behavioral pattern recognition
     
   # Stereotypy detection
   stereotypy:
@@ -185,6 +250,17 @@ autism_analysis:
     turn_taking: 0.30      # Turn-taking reciprocity
     responsiveness: 0.20   # Response latency
     attention: 0.15        # Attention stability
+
+# ===== CLINICAL TRANSCRIPTION =====
+# Advanced behavioral transcription with Gemini
+clinical_transcription:
+  enabled: true  # Enable advanced behavioral analysis
+  session_type: therapy  # therapy, assessment, diagnostic, etc.
+  # Uses Gemini 2.5 Flash for:
+  #   - Strict verbatim transcription (all disfluencies)
+  #   - Behavioral pattern detection (echolalia, stuttering)
+  #   - Sentiment and tone analysis
+  #   - Clinical insights and recommendations
 
 # ===== CLINICAL ANALYSIS =====
 clinical_analysis:

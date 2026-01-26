@@ -21,7 +21,7 @@ Engineering approach:
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Tuple, Optional
 
 import numpy as np
@@ -87,29 +87,30 @@ class TurnTakingAnalysis:
     reciprocity_score: float
     turn_events: List[TurnTakingEvent] = field(default_factory=list)
     explanation: str = ""
+    calculation_audit: Optional[Dict] = None
 
 
 def analyze_turn_taking(
     speaker_segments: List,
     child_label: str = "SPEAKER_00",
-    config: Dict = None
+    config: Dict = None,
+    transcript: Optional['ClinicalTranscript'] = None
 ) -> TurnTakingAnalysis:
     """
-    Analyze turn-taking dynamics from speaker segments.
+    Analyze turn-taking dynamics from speaker segments OR clinical transcript.
     
     Args:
         speaker_segments: List of SpeakerSegment objects from diarization
         child_label: Speaker label for child (auto-detected if not specified)
         config: Configuration dict with thresholds
+        transcript: ClinicalTranscript object (optional) - PREFERRED if available
         
     Returns:
         TurnTakingAnalysis object with metrics
     """
-    if not speaker_segments:
-        logger.warning("No speaker segments provided")
+    if not speaker_segments and not transcript:
+        logger.warning("No data provided for turn-taking analysis")
         return _create_empty_analysis()
-    
-    logger.info(f"Analyzing turn-taking for {len(speaker_segments)} segments")
     
     # Get config thresholds
     if config is None:
@@ -120,17 +121,28 @@ def analyze_turn_taking(
     latency_threshold_typical = autism_config.get('typical_latency_sec', 1.0)
     latency_threshold_elevated = autism_config.get('elevated_latency_sec', 3.0)
     
-    # Auto-detect child speaker if not specified (typically speaks less)
-    if child_label == "SPEAKER_00":
-        child_label = _identify_child_speaker(speaker_segments)
-        logger.info(f"Auto-detected child speaker: {child_label}")
-    
-    # Build turn events
-    turn_events = _build_turn_events(
-        speaker_segments,
-        child_label,
-        interruption_threshold
-    )
+    # Pathway 1: Use Transcript (Higher Accuracy)
+    if transcript:
+        logger.info(f"Using clinical transcript for turn-taking analysis ({len(transcript.segments)} segments)")
+        turn_events = _build_turn_events_from_transcript(
+            transcript,
+            interruption_threshold
+        )
+    else:
+        # Pathway 2: Use Raw Diarization (Fallback)
+        logger.info(f"Using raw diarization for turn-taking analysis ({len(speaker_segments)} segments)")
+        
+        # Auto-detect child speaker if not specified (typically speaks less)
+        if child_label == "SPEAKER_00":
+            child_label = _identify_child_speaker(speaker_segments)
+            logger.info(f"Auto-detected child speaker: {child_label}")
+        
+        # Build turn events
+        turn_events = _build_turn_events(
+            speaker_segments,
+            child_label,
+            interruption_threshold
+        )
     
     # Compute statistics
     child_turns = [t for t in turn_events if t.speaker == 'child']
@@ -176,6 +188,27 @@ def analyze_turn_taking(
         latency_threshold_elevated
     )
     
+    # Build audit trail
+    calculation_audit = {
+        'turns_detected': [asdict(t) for t in turn_events],
+        'score_calculation': {
+            'total_turns': len(turn_events),
+            'child_turns': len(child_turns),
+            'therapist_turns': len(therapist_turns),
+            'child_speaking_time': child_speaking_time,
+            'therapist_speaking_time': therapist_speaking_time,
+            'child_percentage': child_percentage,
+            'balance_deviation_from_ideal': abs(50 - child_percentage),
+            'mean_response_latency': mean_latency,
+            'median_response_latency': median_latency,
+            'interruption_count': interruption_count,
+            'balance_score': balance_score,
+            'reciprocity_score': reciprocity_score,
+            'formula': 'Reciprocity based on latency deviation from typical, interruption rate, and turn alternation'
+        },
+        'thresholds': autism_config
+    }
+
     return TurnTakingAnalysis(
         total_turns=len(turn_events),
         child_turns=len(child_turns),
@@ -190,7 +223,8 @@ def analyze_turn_taking(
         conversational_balance_score=float(balance_score),
         reciprocity_score=float(reciprocity_score),
         turn_events=turn_events,
-        explanation=explanation
+        explanation=explanation,
+        calculation_audit=calculation_audit
     )
 
 
@@ -462,3 +496,68 @@ def get_response_latency_distribution(
         'counts': counts,
         'labels': labels
     }
+
+
+# --- FUSION HELPERS ---
+
+def _build_turn_events_from_transcript(
+    transcript: 'ClinicalTranscript',
+    interruption_threshold: float
+) -> List[TurnTakingEvent]:
+    """
+    Build turn-taking events directly from clinical transcript segments.
+    Higher accuracy than diarization because speakers are linguistically identified.
+    """
+    turn_events = []
+    
+    # Sort segments by time
+    sorted_segments = sorted(transcript.segments, key=lambda s: s.start_time)
+    
+    previous_speaker = None
+    previous_end_time = 0.0
+    
+    for segment in sorted_segments:
+        # Transcript uses 'child'/'therapist' (or 'patient'/'clinician')
+        # Normalize to standard labels
+        raw_speaker = segment.speaker.lower()
+        if 'child' in raw_speaker or 'patient' in raw_speaker:
+            speaker = 'child'
+        elif 'therapist' in raw_speaker or 'clinician' in raw_speaker or 'doctor' in raw_speaker:
+            speaker = 'therapist'
+        else:
+            speaker = 'unknown' # Should not happen with good prompting
+            
+        start_time = segment.start_time
+        end_time = segment.end_time
+        duration = end_time - start_time
+        
+        # Calculate response latency
+        if previous_end_time > 0:
+            gap = start_time - previous_end_time
+            
+            if gap < -interruption_threshold:
+                 interruption = True
+                 response_latency = 0.0
+            else:
+                 interruption = False
+                 response_latency = max(0.0, gap)
+        else:
+            response_latency = None
+            interruption = False
+            
+        turn_event = TurnTakingEvent(
+            speaker=speaker,
+            start_time=start_time,
+            end_time=end_time,
+            duration=duration,
+            response_latency=response_latency,
+            interruption=interruption,
+            previous_speaker=previous_speaker
+        )
+        
+        turn_events.append(turn_event)
+        
+        previous_speaker = speaker
+        previous_end_time = end_time
+        
+    return turn_events

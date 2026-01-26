@@ -185,11 +185,13 @@ def _compute_presence_score(video_aggregated: List) -> float:
     pose_detection_rates = []
     
     for window in video_aggregated:
+        # face_features and pose_features are already dicts
         face_feat = window.face_features
         pose_feat = window.pose_features
         
-        face_rate = face_feat.get('face_detection_rate', 0.0)
-        pose_rate = pose_feat.get('pose_detection_rate', 0.0)
+        # Extract detection rates from the dict
+        face_rate = face_feat.get('face_detection_rate', 0.0) if isinstance(face_feat, dict) else 0.0
+        pose_rate = pose_feat.get('pose_detection_rate', 0.0) if isinstance(pose_feat, dict) else 0.0
         
         face_detection_rates.append(face_rate)
         pose_detection_rates.append(pose_rate)
@@ -197,9 +199,16 @@ def _compute_presence_score(video_aggregated: List) -> float:
     if not face_detection_rates:
         return 50.0
     
-    # Average detection rates
-    mean_face_detection = np.mean(face_detection_rates)
-    mean_pose_detection = np.mean(pose_detection_rates)
+    # Filter out non-numeric values and ensure we have valid data
+    valid_face_rates = [r for r in face_detection_rates if isinstance(r, (int, float)) and not np.isnan(r)]
+    valid_pose_rates = [r for r in pose_detection_rates if isinstance(r, (int, float)) and not np.isnan(r)]
+    
+    if not valid_face_rates and not valid_pose_rates:
+        return 50.0
+    
+    # Average detection rates - use 0.0 as fallback if list is empty
+    mean_face_detection = np.mean(valid_face_rates) if valid_face_rates else 0.0
+    mean_pose_detection = np.mean(valid_pose_rates) if valid_pose_rates else 0.0
     
     # Combined presence score (average)
     presence_score = 100.0 * (mean_face_detection + mean_pose_detection) / 2.0

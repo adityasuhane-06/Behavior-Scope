@@ -96,6 +96,78 @@ Results:
 
 **Documentation:** Refer to [AUTISM_ANALYSIS_GUIDE.md](AUTISM_ANALYSIS_GUIDE.md) for comprehensive specifications
 
+---
+
+## Audit and Verification System
+
+**Complete Traceability for All Analysis Results**
+
+The Behavior Scope audit system automatically stores all analysis results in a structured, queryable database, providing:
+
+- ✓ **Complete auditability** - Know exactly what the system said about every session
+- ✓ **Result verification** - Compare and validate analyses across sessions
+- ✓ **Historical queries** - Search and retrieve past analyses by video, date, or session ID
+- ✓ **Confidence tracking** - View confidence levels for all detections
+- ✓ **Reproducibility** - Configuration snapshots enable exact replication
+- ✓ **Quality assurance** - Complete operation logs for debugging and validation
+
+### Quick Start
+
+```bash
+# Run analysis (audit happens automatically)
+python main.py --video session.mp4 --output results/
+
+# View what the system said
+python audit_query.py view <session_id>
+
+# Search for sessions
+python audit_query.py search --video "therapy_session.mp4"
+
+# Export detailed report
+python audit_query.py export <session_id> --output report.json
+
+# View statistics
+python audit_query.py stats
+```
+
+### Key Features
+
+**Automatic Storage**: Every analysis automatically saves:
+- All behavioral scores (VRI, MAI, ASS, RCI, FAI)
+- Autism-specific results (turn-taking, eye contact, social engagement)
+- Clinical assessments (stuttering, responsiveness)
+- Individual dysregulation segments with confidence levels and **frame numbers**
+- **Frame-by-frame tracking** (detections, action units, timestamps for every analyzed frame)
+- Complete operation logs
+- Configuration snapshots
+
+**Query Interface**: Easily retrieve and verify results:
+```bash
+# List recent sessions
+python audit_query.py list
+
+# View detailed session information
+python audit_query.py view session_20260123_135106 --detailed
+
+# Search by criteria
+python audit_query.py search --from-date 2026-01-20 --to-date 2026-01-23
+
+# View frame-level analysis
+python audit_query.py frames session_20260123_135106
+python audit_query.py frames session_20260123_135106 --detection-type eye_contact
+```
+
+**Human-Readable Exports**: Export any session as JSON for external review:
+```bash
+python audit_query.py export session_20260123_135106 --output report.json
+```
+
+**Database Location**: `data/audit/behavior_scope_audit.db`
+
+**Documentation:** See [docs/AUDIT_SYSTEM.md](docs/AUDIT_SYSTEM.md) for complete usage guide and examples
+
+---
+
 ##Use Constraints
 
 **IMPORTANT - NON-DIAGNOSTIC TOOL:**

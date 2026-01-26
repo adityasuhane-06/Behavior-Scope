@@ -29,12 +29,8 @@ from .turn_taking import (
     get_response_latency_distribution
 )
 
-from .eye_contact import (
-    EyeContactEvent,
-    EyeContactAnalysis,
-    analyze_eye_contact,
-    compute_eye_contact_during_speaking
-)
+# Eye contact analysis is now handled by Enhanced Attention Tracking System
+# from .eye_contact import (...)  # Replaced with enhanced system
 
 from .stereotypy import (
     StereotypyEvent,
@@ -56,11 +52,11 @@ __all__ = [
     'compute_response_latency_child',
     'get_response_latency_distribution',
     
-    # Eye contact
-    'EyeContactEvent',
-    'EyeContactAnalysis',
-    'analyze_eye_contact',
-    'compute_eye_contact_during_speaking',
+    # Eye contact - now handled by Enhanced Attention Tracking System
+    # 'EyeContactEvent',
+    # 'EyeContactAnalysis', 
+    # 'analyze_eye_contact',
+    # 'compute_eye_contact_during_speaking',
     
     # Stereotypy
     'StereotypyEvent',

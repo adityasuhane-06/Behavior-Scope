@@ -88,7 +88,13 @@ def compute_social_engagement_index(
     # Extract component scores
     eye_contact_score = 0.0
     if eye_contact_analysis:
-        eye_contact_score = eye_contact_analysis.eye_contact_score
+        # Handle both original and enhanced eye contact analysis
+        if hasattr(eye_contact_analysis, 'final_eye_contact_score'):
+            # Enhanced eye contact analysis
+            eye_contact_score = eye_contact_analysis.final_eye_contact_score
+        else:
+            # Original eye contact analysis
+            eye_contact_score = eye_contact_analysis.eye_contact_score
     
     turn_taking_score = 0.0
     if turn_taking_analysis:
@@ -216,11 +222,23 @@ def _compute_sei_confidence(
     """
     confidence = 0.0
     
-    # Eye contact component
-    if eye_contact_analysis and eye_contact_analysis.episode_count > 5:
-        confidence += 0.35
-    elif eye_contact_analysis:
-        confidence += 0.20
+    # Eye contact component - handle both old and enhanced analysis
+    if eye_contact_analysis:
+        # Check if it's enhanced analysis (has analysis_method attribute)
+        if hasattr(eye_contact_analysis, 'analysis_method'):
+            # Enhanced analysis - use final score and confidence
+            if eye_contact_analysis.final_eye_contact_score > 50:
+                confidence += 0.35
+            elif eye_contact_analysis.final_eye_contact_score > 25:
+                confidence += 0.25
+            else:
+                confidence += 0.15
+        else:
+            # Original analysis - use episode count
+            if eye_contact_analysis.episode_count > 5:
+                confidence += 0.35
+            else:
+                confidence += 0.20
     
     # Turn-taking component
     if turn_taking_analysis and turn_taking_analysis.total_turns > 10:

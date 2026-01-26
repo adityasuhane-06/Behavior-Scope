@@ -1,0 +1,1 @@
+"""Core data models and interfaces for the Enhanced Attention Tracking System."""

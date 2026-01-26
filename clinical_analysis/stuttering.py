@@ -21,7 +21,7 @@ Engineering approach:
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Optional, Tuple
 
 import numpy as np
@@ -51,6 +51,7 @@ class DisfluencyEvent:
     severity: str
     audio_pattern: str
     confidence: float = 0.0
+    associated_word: Optional[str] = None
 
 
 @dataclass
@@ -80,22 +81,25 @@ class StutteringAnalysis:
     repetition_units: float
     events: List[DisfluencyEvent] = field(default_factory=list)
     interpretation: str = ""
+    calculation_audit: Optional[Dict] = None
 
 
 def analyze_stuttering(
     prosodic_features: List,
     speaker_segments: List,
     target_speaker: str = None,
-    config: Dict = None
+    config: Dict = None,
+    transcript: Optional['ClinicalTranscript'] = None
 ) -> StutteringAnalysis:
     """
-    Analyze stuttering/disfluency patterns from audio features.
+    Analyze stuttering/disfluency patterns from audio features AND clinical transcript.
     
     Args:
         prosodic_features: List of prosodic feature dicts
         speaker_segments: List of speaker segments
         target_speaker: Speaker to analyze (auto-detect if None)
         config: Configuration dict with thresholds
+        transcript: ClinicalTranscript object (optional) from Gemini
         
     Returns:
         StutteringAnalysis object
@@ -105,6 +109,8 @@ def analyze_stuttering(
         return _create_empty_stuttering_analysis()
     
     logger.info(f"Analyzing stuttering from {len(prosodic_features)} segments")
+    if transcript:
+        logger.info("Using clinical transcript for linguistic disfluency detection (Fusion)")
     
     # Get config thresholds
     if config is None:
@@ -126,7 +132,7 @@ def analyze_stuttering(
     # Detect disfluencies
     events = []
     
-    # 1. Sound/syllable repetitions
+    # 1. Sound/syllable repetitions (Acoustic)
     repetition_events = _detect_repetitions(
         target_features,
         target_segments,
@@ -134,7 +140,7 @@ def analyze_stuttering(
     )
     events.extend(repetition_events)
     
-    # 2. Prolongations
+    # 2. Prolongations (Acoustic)
     prolongation_events = _detect_prolongations(
         target_features,
         target_segments,
@@ -142,13 +148,18 @@ def analyze_stuttering(
     )
     events.extend(prolongation_events)
     
-    # 3. Blocks (unusual pauses)
+    # 3. Blocks (Acoustic)
     block_events = _detect_blocks(
         target_features,
         target_segments,
         block_threshold
     )
     events.extend(block_events)
+    
+    # 4. Linguistic Disfluencies (Transcript)
+    if transcript:
+        transcript_events = _detect_transcript_disfluencies(transcript, target_speaker)
+        events = _fuse_disfluency_events(events, transcript_events)
     
     # Sort by time
     events.sort(key=lambda e: e.start_time)
@@ -178,7 +189,7 @@ def analyze_stuttering(
     disfluency_rate = (total_disfluencies / estimated_syllables * 100) if estimated_syllables > 0 else 0.0
     
     # Stuttering Severity Index (SSI-4 inspired)
-    ssi = _compute_stuttering_severity_index(
+    ssi, ssi_breakdown = _compute_stuttering_severity_index(
         disfluency_rate,
         events,
         total_speaking_time
@@ -200,6 +211,32 @@ def analyze_stuttering(
         total_disfluencies
     )
     
+    # Build audit trail
+    calculation_audit = {
+        'events_detected': [asdict(e) for e in events],
+        'score_calculation': {
+            'total_speaking_time': total_speaking_time,
+            'estimated_syllables': estimated_syllables,
+            'total_disfluencies': total_disfluencies,
+            'disfluency_rate_per_100': disfluency_rate,
+            'longest_block_duration': longest_block,
+            'average_repetition_units': repetition_units,
+            'final_ssi': ssi,
+            # SSI Component Breakdown
+            'frequency_score': ssi_breakdown['frequency_score'],
+            'frequency_max': ssi_breakdown['frequency_max'],
+            'duration_score': ssi_breakdown['duration_score'],
+            'duration_max': ssi_breakdown['duration_max'],
+            'mean_event_duration': ssi_breakdown['mean_duration'],
+            'severity_score': ssi_breakdown['severity_score'],
+            'severity_max': ssi_breakdown['severity_max'],
+            'formula': ssi_breakdown['formula']
+        },
+        'type_distribution': type_counts,
+        'severity_distribution': severity_counts,
+        'thresholds': stutter_config
+    }
+    
     return StutteringAnalysis(
         total_disfluencies=total_disfluencies,
         disfluency_rate=float(disfluency_rate),
@@ -210,7 +247,8 @@ def analyze_stuttering(
         longest_block=float(longest_block),
         repetition_units=float(repetition_units),
         events=events,
-        interpretation=interpretation
+        interpretation=interpretation,
+        calculation_audit=calculation_audit
     )
 
 
@@ -393,15 +431,18 @@ def _compute_stuttering_severity_index(
     disfluency_rate: float,
     events: List[DisfluencyEvent],
     speaking_time: float
-) -> float:
+) -> Tuple[float, Dict]:
     """
     Compute Stuttering Severity Index (0-100).
     
     Inspired by SSI-4 (Stuttering Severity Instrument).
     Components:
-    - Frequency (disfluency rate)
-    - Duration (longest events)
-    - Physical concomitants (severity distribution)
+    - Frequency (disfluency rate) -> 0-40 points
+    - Duration (mean event duration) -> 0-40 points  
+    - Physical concomitants (severity distribution) -> 0-20 points
+    
+    Returns:
+        Tuple of (total_score, breakdown_dict)
     """
     # Component 1: Frequency score (0-40 points)
     if disfluency_rate < 1.0:
@@ -438,7 +479,20 @@ def _compute_stuttering_severity_index(
     
     total = freq_score + dur_score + sev_score
     
-    return float(np.clip(total, 0.0, 100.0))
+    breakdown = {
+        'frequency_score': freq_score,
+        'frequency_max': 40,
+        'frequency_rate': disfluency_rate,
+        'duration_score': dur_score,
+        'duration_max': 40,
+        'mean_duration': mean_duration,
+        'severity_score': sev_score,
+        'severity_max': 20,
+        'severe_ratio': severe_ratio,
+        'formula': 'SSI = Frequency Score (0-40) + Duration Score (0-40) + Severity Score (0-20)'
+    }
+    
+    return float(np.clip(total, 0.0, 100.0)), breakdown
 
 
 def _estimate_repetition_units(repetitions: List[DisfluencyEvent]) -> float:
@@ -551,3 +605,158 @@ def get_disfluency_timeline(
         'counts': counts,
         'times': times
     }
+
+
+# --- FUSION HELPERS ---
+
+def _detect_transcript_disfluencies(
+    transcript: 'ClinicalTranscript',
+    target_speaker: str
+) -> List[DisfluencyEvent]:
+    """
+    Detect disfluencies from linguistic transcript tags.
+    """
+    events = []
+    
+    # Map speaker label (e.g., 'SPEAKER_00') to transcript roles ('child', 'therapist')
+    # This is a simplification; ideally we pass explicit mapping
+    target_role = 'child' # Default assumption for patient
+    
+    for segment in transcript.segments:
+        # Check if segment speaker matches target
+        # Handle both speaker_id (standard) and speaker (legacy)
+        speaker = getattr(segment, 'speaker_id', getattr(segment, 'speaker', None))
+        
+        is_target = False
+        if speaker == target_role or speaker == target_speaker:
+            is_target = True
+        elif speaker and 'patient' in speaker.lower():
+            is_target = True
+        elif speaker and 'child' in speaker.lower():
+            is_target = True
+            
+        if not is_target:
+            continue
+            
+        # 1. Check strict textual repetitions (e.g., "I I I want")
+        # This catches whole-word repetitions that acoustic signal often misses
+        text = segment.text.lower()
+        
+        # Strip any tags before analysis
+        for tag in ['[question]', '[response]', '[affirming]', '[instruction]']:
+            text = text.replace(tag, '')
+        text = text.strip()
+        
+        words = text.split()
+        for i in range(len(words) - 1):
+            if words[i] == words[i+1]:
+                # Found word repetition
+                # Estimate time (linear interpolation within segment)
+                seg_duration = segment.end_time - segment.start_time
+                word_duration = seg_duration / len(words) if len(words) > 0 else 0.1
+                start = segment.start_time + (i * word_duration)
+                
+                event = DisfluencyEvent(
+                    start_time=start,
+                    end_time=start + (word_duration * 2),
+                    duration=word_duration * 2,
+                    disfluency_type='word_repetition',
+                    severity='mild',
+                    audio_pattern='text_repetition',
+                    confidence=0.9,
+                    associated_word=words[i]
+                )
+                events.append(event)
+        
+        # 2. Check for sound/syllable repetitions (e.g., "p-p-park", "k-k-kids")
+        import re
+        sound_repetition_pattern = r'\b([a-z])-\1+-[a-z]+\b'  # Matches p-p-park, k-k-k-kids, etc.
+        matches = re.finditer(sound_repetition_pattern, text)
+        for match in matches:
+            word = match.group(0)
+            # Estimate position
+            word_start_idx = text[:match.start()].count(' ')
+            seg_duration = segment.end_time - segment.start_time
+            word_duration = seg_duration / len(words) if len(words) > 0 else 0.1
+            start = segment.start_time + (word_start_idx * word_duration)
+            
+            event = DisfluencyEvent(
+                start_time=start,
+                end_time=start + word_duration,
+                duration=word_duration,
+                disfluency_type='sound_repetition',
+                severity='moderate',
+                audio_pattern='text_sound_repetition',
+                confidence=0.95,
+                associated_word=word
+            )
+            events.append(event)
+
+        # 3. Check behavioral tags (Gemini's analysis) - safely access attributes
+        behavioral_tags = getattr(segment, 'behavioral_tags', [])
+        annotations = getattr(segment, 'annotations', [])
+        
+        if behavioral_tags and 'disfluency' in behavioral_tags:
+             # Find specific annotations
+             for ann in annotations:
+                  if hasattr(ann, 'type') and ann.type == 'disfluency':
+                      event = DisfluencyEvent(
+                          start_time=getattr(ann, 'start_time', segment.start_time),
+                          end_time=getattr(ann, 'end_time', segment.end_time),
+                          duration=getattr(ann, 'end_time', segment.end_time) - getattr(ann, 'start_time', segment.start_time),
+                          disfluency_type=ann.description.lower().split()[0] if getattr(ann, 'description', None) else 'stutter',
+                          severity=getattr(ann, 'severity', 'mild') or 'mild',
+                          audio_pattern='linguistic_tag',
+                          confidence=0.85,
+                          associated_word=segment.text
+                      )
+                      events.append(event)
+                     
+    return events
+
+
+def _fuse_disfluency_events(
+    acoustic_events: List[DisfluencyEvent],
+    transcript_events: List[DisfluencyEvent]
+) -> List[DisfluencyEvent]:
+    """
+    Fuse acoustic and linguistic disfluency events.
+    Strategy: Union of events, merging overlaps.
+    """
+    fused = []
+    
+    # Start with all acoustic events
+    fused.extend(acoustic_events)
+    
+    # Add non-overlapping transcript events
+    for t_event in transcript_events:
+        is_covered = False
+        for a_event in acoustic_events:
+            # Check overlap
+            overlap_start = max(t_event.start_time, a_event.start_time)
+            overlap_end = min(t_event.end_time, a_event.end_time)
+            
+            if overlap_end > overlap_start:
+                # Overlap found! 
+                # Linguistic detection usually more specific about TYPE, acoustic about TIMING
+                # Update type if generic
+                if a_event.disfluency_type in ['speech_anomaly', 'stutter']:
+                    a_event.disfluency_type = t_event.disfluency_type
+                
+                # Boost confidence
+                a_event.confidence = max(a_event.confidence, t_event.confidence)
+                # Copy word context if available
+                if t_event.associated_word:
+                    a_event.associated_word = t_event.associated_word
+                is_covered = True
+                break
+        
+        if not is_covered:
+            fused.append(t_event)
+            
+    return fused
+
+
+# Helper for estimating repetition units for text-based events
+def _estimate_text_repetition_units(events: List[DisfluencyEvent]) -> float:
+    return 0.0

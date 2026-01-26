@@ -1,0 +1,1 @@
+"""Detection engines for eye contact and attention tracking."""

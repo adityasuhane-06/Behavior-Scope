@@ -22,10 +22,15 @@ from .pose_analyzer import (
     PoseFeatures,
     analyze_pose_segment
 )
+from .improved_temporal_agg import (
+    ImprovedTemporalAggregator as TemporalAggregator,
+    aggregate_features_improved as aggregate_features,
+    ImprovedAggregatedFeatures as AggregatedFeatures
+)
+# Import legacy functions for backward compatibility
 from .temporal_agg import (
-    TemporalAggregator,
-    aggregate_features,
-    compute_sliding_window_stats
+    compute_sliding_window_stats,
+    detect_motion_bursts
 )
 
 __all__ = [
@@ -37,5 +42,7 @@ __all__ = [
     'analyze_pose_segment',
     'TemporalAggregator',
     'aggregate_features',
+    'AggregatedFeatures',
     'compute_sliding_window_stats',
+    'detect_motion_bursts',
 ]

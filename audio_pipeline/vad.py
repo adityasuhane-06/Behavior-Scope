@@ -47,6 +47,7 @@ class SpeechSegment:
 def run_voice_activity_detection(
     audio_data: np.ndarray,
     sample_rate: int,
+    config: dict = None,
     frame_duration_ms: int = 30,
     min_speech_duration_ms: int = 250,
     min_silence_duration_ms: int = 100,
@@ -64,6 +65,7 @@ def run_voice_activity_detection(
     Args:
         audio_data: Audio waveform (mono, 16kHz recommended)
         sample_rate: Audio sample rate in Hz
+        config: Configuration dictionary (optional)
         frame_duration_ms: VAD frame size in milliseconds (30ms default)
         min_speech_duration_ms: Minimum speech segment length to keep
         min_silence_duration_ms: Minimum silence gap to split segments
@@ -77,6 +79,17 @@ def run_voice_activity_detection(
         - Batched processing for efficiency
         - Post-processing merges short gaps (reduces fragmentation)
     """
+    # Extract parameters from config if provided
+    if config:
+        vad_config = config.get('audio', {}).get('vad', {})
+        frame_duration_ms = vad_config.get('frame_duration_ms', frame_duration_ms)
+        min_speech_duration_ms = vad_config.get('min_speech_duration_ms', min_speech_duration_ms)
+        min_silence_duration_ms = vad_config.get('min_silence_duration_ms', min_silence_duration_ms)
+    
+    # Use longer minimum durations for better transcription accuracy
+    min_speech_duration_ms = max(min_speech_duration_ms, 500)  # At least 0.5s for good transcription
+    min_silence_duration_ms = max(min_silence_duration_ms, 200)  # Better segment separation
+    
     logger.info(f"Running VAD on {len(audio_data)/sample_rate:.2f}s audio")
     
     try:
